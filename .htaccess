@@ -5,6 +5,10 @@
     RewriteRule ^\.env - [F,L,NC]
     RewriteRule (^|/)\.(?!well-known) - [F]
 
+    # Redirect /m to /m/ so <base href="/m/"> resolves relative assets properly
+    RewriteRule ^m$ /m/ [L,R=301]
+    RewriteRule ^m/$ public/m/index.html [L]
+
     # Rewrite all requests to the public/ folder
     RewriteCond %{REQUEST_URI} !^/public/
     RewriteRule ^(.*)$ public/$1 [L]

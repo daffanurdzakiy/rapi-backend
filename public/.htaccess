@@ -3,7 +3,13 @@
         Options -MultiViews -Indexes
     </IfModule>
 
+    DirectoryIndex index.html index.php
+
     RewriteEngine On
+
+    # Serve Flutter Web app at /m/
+    RewriteRule ^m$ /m/ [L,R=301]
+    RewriteRule ^m/$ m/index.html [L]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
