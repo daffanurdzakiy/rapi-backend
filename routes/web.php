@@ -101,3 +101,13 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::put('/agenda/{event}', [EventController::class, 'update'])->name('events.update');
     Route::delete('/agenda/{event}', [EventController::class, 'destroy'])->name('events.destroy');
 });
+
+// Route bantuan untuk membuat symlink storage (akses foto laporan/pengaduan) di cPanel
+Route::get('/init-storage', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('storage:link');
+        return 'Storage link berhasil dibuat! Foto laporan dan pengaduan sekarang siap diakses.';
+    } catch (\Exception $e) {
+        return 'Info: ' . $e->getMessage();
+    }
+});
