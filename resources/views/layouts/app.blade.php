@@ -141,17 +141,47 @@
             .logout { margin-left: 0; }
         }
         @media (max-width: 760px) {
-            .top { gap: 5px; padding-right: 8px; padding-left: 8px; }
-            .brand { gap: 3px; font-size: 14px; }
-            .brand img { width: 22px; height: 22px; }
-            .nav a { min-height: 56px; padding-right: 3px; padding-left: 3px; font-size: 8px; }
-            .nav a::after { right: 4px; left: 4px; }
-            .top-actions { gap: 5px; }
-            .profile-avatar { flex-basis: 28px; width: 28px; height: 28px; font-size: 11px; }
-            .profile { max-width: 54px; font-size: 8px; }
-            .profile small { display: none; }
-            .logout button { padding: 0 4px; font-size: 9px; }
-            .content { padding: 26px 12px 40px; }
+            .top {
+                flex-wrap: wrap;
+                min-height: auto;
+                padding: 10px 14px;
+                gap: 8px 12px;
+            }
+            .brand { font-size: 18px; }
+            .brand img { width: 26px; height: 26px; }
+            .top-actions { margin-left: auto; gap: 8px; }
+            .profile-avatar { flex-basis: 30px; width: 30px; height: 30px; font-size: 12px; }
+            .profile { max-width: 100px; font-size: 11px; }
+            .profile small { display: block; font-size: 9px; }
+            .logout { margin-left: 2px; }
+            .nav {
+                order: 3;
+                width: 100%;
+                flex: 0 0 100%;
+                justify-content: flex-start;
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                padding: 4px 0 2px;
+                gap: 6px;
+            }
+            .nav::-webkit-scrollbar { display: none; }
+            .nav a {
+                min-height: 36px;
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                background: #f1f3f6;
+                color: #667386;
+                white-space: nowrap;
+            }
+            .nav a.active {
+                background: #35465e;
+                color: #fffdf8;
+            }
+            .nav a::after { display: none; }
+            .content { padding: 20px 12px 40px; }
             .stats, .grid2 { grid-template-columns: 1fr; }
             .stats { gap: 8px; }
             .stat { min-height: 112px; }
