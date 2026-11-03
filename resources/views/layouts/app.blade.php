@@ -73,21 +73,14 @@
         .heading h2, h2 { color: var(--text); }
         .heading h3, h3 { color: var(--text); }
         .heading p { margin: 7px 0 22px; color: var(--muted); font-size: 14px; line-height: 1.55; }
-        .card { margin-top: 16px; padding: 23px 24px; border: 1px solid var(--border); border-radius: 15px; background: var(--panel); box-shadow: 0 9px 22px rgba(38, 54, 74, .06); }
-        .card h2:first-child, .card h3:first-child { margin-top: 0; }
-        .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
-        .dashboard-heading { align-items: start; margin-bottom: 8px; }
-        .dashboard-heading p { margin-bottom: 20px; }
-        .dashboard-date { padding-top: 6px; color: #46566d; font-size: 13px; white-space: nowrap; }
-        .stat { position: relative; min-height: 126px; overflow: hidden; }
-        .stat::after { position: absolute; top: -35px; right: -22px; width: 110px; height: 110px; border: 1px solid rgba(132, 158, 255, .08); border-radius: 50%; background: rgba(100, 131, 255, .035); content: ""; }
-        .stat b { display: block; margin: 12px 0 5px; color: #26364a; font-size: 34px; line-height: 1; }
-        .stat .muted:first-child { font-size: 11px; font-weight: 700; letter-spacing: .08em; }
-        .stat-alert b { color: var(--danger); }
-        .quick-action { min-width: 190px; justify-content: flex-start; }
-        .muted { color: var(--muted); }
-        .grid2 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, .95fr); align-items: start; gap: 16px; }
-        .btn { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 8px; padding: 10px 15px; border: 1px solid transparent; border-radius: 9px; background: var(--accent); color: #fffdf8; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; transition: transform .16s, background .16s, box-shadow .16s, border-color .16s; }
+        .card { margin-top: 16px; padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); box-shadow: 0 6px 18px rgba(38, 54, 74, .05); }
+        .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+        .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+        .stat { display: flex; min-height: 128px; flex-direction: column; justify-content: space-between; padding: 18px 20px; border: 1px solid #e8e1d3; border-radius: 14px; background: #fffdf8; box-shadow: 0 4px 12px rgba(38, 54, 74, .03); }
+        .stat .k { color: #6d7788; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+        .stat .v { color: #26364a; font-size: 32px; font-weight: 800; line-height: 1; }
+        .stat .hint { color: #6d7788; font-size: 13px; }
+        .btn { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; padding: 0 16px; border: 1px solid transparent; border-radius: 8px; background: var(--accent); color: #fffdf8; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; transition: transform .18s, background .18s, box-shadow .18s; }
         .btn:hover { transform: translateY(-1px); background: var(--accent-hover); color: #fffdf8; box-shadow: 0 5px 13px rgba(53, 70, 94, .16); }
         .btn.warn, .btn.danger { background: #465a73; color: #fffdf8; }
         .btn.warn:hover, .btn.danger:hover { background: #26364a; color: #fffdf8; }
@@ -130,6 +123,11 @@
         img { max-width: 100%; }
         [hidden] { display: none !important; }
 
+        /* Mobile Bottom Navigation (Mirip Flutter NavigationBar) */
+        .mobile-bottom-nav {
+            display: none;
+        }
+
         @media (max-width: 1050px) {
             .top { gap: 8px; }
             .brand { gap: 5px; font-size: 17px; }
@@ -140,57 +138,105 @@
             .profile small { font-size: 9px; }
             .logout { margin-left: 0; }
         }
+
+        /* Mobile View: Tampilan Sama Persis dengan Flutter Mobile App */
         @media (max-width: 760px) {
             .top {
-                flex-wrap: wrap;
-                min-height: auto;
-                padding: 10px 14px;
-                gap: 8px 12px;
+                min-height: 58px;
+                padding: 0 16px;
+                justify-content: space-between;
+                gap: 12px;
             }
             .brand { font-size: 18px; }
-            .brand img { width: 26px; height: 26px; }
-            .top-actions { margin-left: auto; gap: 8px; }
-            .profile-avatar { flex-basis: 30px; width: 30px; height: 30px; font-size: 12px; }
-            .profile { max-width: 100px; font-size: 11px; }
-            .profile small { display: block; font-size: 9px; }
-            .logout { margin-left: 2px; }
+            .brand img { width: 28px; height: 28px; }
+            
+            /* Sembunyikan desktop navbar dari atas */
             .nav {
-                order: 3;
-                width: 100%;
-                flex: 0 0 100%;
-                justify-content: flex-start;
-                overflow-x: auto;
-                overflow-y: hidden;
-                -webkit-overflow-scrolling: touch;
-                padding: 4px 0 2px;
-                gap: 6px;
+                display: none !important;
             }
-            .nav::-webkit-scrollbar { display: none; }
-            .nav a {
-                min-height: 36px;
-                padding: 6px 12px;
-                border-radius: 6px;
+
+            .top-actions {
+                margin-left: auto;
+                gap: 10px;
+            }
+            .profile-avatar {
+                flex-basis: 32px;
+                width: 32px;
+                height: 32px;
                 font-size: 12px;
-                font-weight: 600;
-                background: #f1f3f6;
-                color: #667386;
-                white-space: nowrap;
             }
-            .nav a.active {
-                background: #35465e;
-                color: #fffdf8;
+            .profile {
+                max-width: 110px;
+                font-size: 12px;
             }
-            .nav a::after { display: none; }
-            .content { padding: 20px 12px 40px; }
+            .profile small {
+                display: block;
+                font-size: 10px;
+            }
+
+            .content {
+                padding: 20px 14px 90px; /* Space bawah untuk bottom navbar */
+            }
+
+            /* Bottom Bar Gaya Flutter (Curved / Modern Floating App Bar) */
+            .mobile-bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 64px;
+                background: rgba(255, 253, 248, 0.98);
+                border-top: 1px solid #e8e1d3;
+                display: flex;
+                align-items: center;
+                justify-content: space-around;
+                z-index: 100;
+                box-shadow: 0 -4px 20px rgba(38, 54, 74, 0.08);
+                backdrop-filter: blur(12px);
+                padding: 0 8px;
+            }
+            .mobile-bottom-nav a {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                flex: 1;
+                height: 100%;
+                color: #7b889b;
+                text-decoration: none;
+                font-size: 11px;
+                font-weight: 500;
+                gap: 3px;
+                transition: color .18s, transform .18s;
+            }
+            .mobile-bottom-nav a svg {
+                width: 22px;
+                height: 22px;
+                stroke: currentColor;
+                fill: none;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                transition: transform .18s;
+            }
+            .mobile-bottom-nav a.active {
+                color: #35465e;
+                font-weight: 700;
+            }
+            .mobile-bottom-nav a.active svg {
+                transform: translateY(-2px);
+                stroke-width: 2.3;
+            }
+
             .stats, .grid2 { grid-template-columns: 1fr; }
-            .stats { gap: 8px; }
-            .stat { min-height: 112px; }
+            .stats { gap: 10px; }
+            .stat { min-height: 110px; border-radius: 16px; }
+            .card { padding: 18px; border-radius: 16px; }
             .form-grid { grid-template-columns: 1fr; }
             .full { grid-column: auto; }
             .heading { flex-wrap: wrap; }
             .heading h1 { font-size: 24px; }
             .heading p { margin-bottom: 16px; }
-            .card { padding: 18px; }
             .report-table-wrap, .card:has(> table) { overflow-x: auto; }
             table { min-width: 620px; font-size: 13px; }
             .dashboard-date { padding: 0 0 12px; }
@@ -238,13 +284,47 @@
                 </form>
             </div>
         </header>
+
         <main class="main">
             <section class="content">
                 @if(session('success'))<p class="success">{{ session('success') }}</p>@endif
                 @yield('content')
             </section>
         </main>
+
+        <!-- Navigasi Bawah Mobile (Mirip CurvedBottomNavbar di Flutter) -->
+        <nav class="mobile-bottom-nav" aria-label="Navigasi Bawah Mobile">
+            <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Beranda</span>
+            </a>
+            <a href="{{ route('events.index') }}" class="{{ request()->routeIs('events.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                <span>Agenda</span>
+            </a>
+            <a href="{{ route('complaints.index') }}" class="{{ request()->routeIs('complaints.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                <span>Pengaduan</span>
+            </a>
+            @if($currentRole === 'Admin')
+            <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span>Laporan</span>
+            </a>
+            @elseif($currentRole === 'PIC')
+            <a href="{{ route('pic.complaint-reports.index') }}" class="{{ request()->routeIs('pic.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg>
+                <span>Laporan</span>
+            </a>
+            @endif
+            <a href="{{ route('profile') }}" class="{{ request()->routeIs('profile') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Profil</span>
+            </a>
+        </nav>
     </div>
+
+    <!-- Route bantuan init-storage tetap ada -->
     <script>
         document.querySelectorAll('.password-toggle').forEach(function (button) {
             button.addEventListener('click', function () {
