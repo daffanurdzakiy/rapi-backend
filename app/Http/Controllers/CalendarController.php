@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Event;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+// Controller untuk menampilkan Kalender Peminjaman Ruangan (baik untuk Publik/Tamu maupun User yang sudah Login).
+class CalendarController extends Controller
+{
+    /** Show an accessible read-only monthly calendar for guests and every role. */
+    public function index(Request $request): View
+    {
+        // Mengambil parameter bulan dari URL (?month=YYYY-MM), default ke bulan saat ini.
+        $requestedMonth = $request->input('month', now()->format('Y-m'));
+        $month = preg_match('/^\d{4}-\d{2}$/', $requestedMonth) ? Carbon::createFromFormat('Y-m', $requestedMonth)->startOfMonth() : now()->startOfMonth();
+        // Kalender publik hanya menampilkan agenda yang statusnya 'Disetujui'.
+        $events = Event::with('room')
+            ->where('status', 'Disetujui')
+            ->whereBetween('event_date', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()])
+            ->orderBy('event_date')
+            ->orderBy('start_time')
+            ->get()
+            ->groupBy(fn ($event) => $event->event_date->format('Y-m-d'));
+
+        // Jika sudah login tampilkan view 'calendar', jika belum login (tamu/siswa) tampilkan 'calendar.public'.
+        return view($request->user() ? 'calendar' : 'calendar.public', [
+            'month' => $month,
+            'events' => $events,
+            'calendarStart' => $month->copy()->startOfWeek(Carbon::MONDAY),
+            'calendarEnd' => $month->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY),
+            'approvedCount' => $events->sum(fn ($dayEvents) => $dayEvents->count()),
+            'calendarRoute' => $request->user() ? 'calendar' : 'calendar.public',
+        ]);
+    }
+}

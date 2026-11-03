@@ -1,0 +1,351 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Resources\EventResource;
+use App\Models\Event;
+use App\Models\Notification;
+use App\Models\Room;
+use App\Models\SessionTime;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+
+// =========================================================================
+// API CONTROLLER: EVENT CONTROLLER (PEMINJAMAN RUANGAN / AGENDA)
+// =========================================================================
+// Mengatur seluruh logika peminjaman ruangan: daftar agenda sesuai role,
+// pengajuan peminjaman baru (beserta validasi H-1, sesi jam, dan anti-bentrok),
+// melihat detail agenda, keputusan persetujuan/penolakan oleh PIC, dan cek ketersediaan.
+class EventController extends ApiController
+{
+    /**
+     * List bookings based on viewer's role and optional query filters.
+     */
+    // Endpoint: GET /api/events
+    // Menampilkan daftar pengajuan agenda:
+    // - PIC: Hanya melihat agenda pada ruangan yang ia kelola
+    // - Guru & Organisasi: Hanya melihat agenda yang mereka ajukan sendiri
+    // - Admin: Melihat seluruh agenda
+    public function index(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $role = $user->role?->role_name;
+
+        $query = Event::with(['room.pic', 'user', 'approver']);
+
+        // Pembatasan data berdasarkan role user yang login
+        if ($role === 'PIC') {
+            $query->whereHas('room', fn ($roomQuery) => $roomQuery->where('pic_id', $user->id));
+        } elseif ($role !== 'Admin') {
+            $query->where('user_id', $user->id);
+        }
+
+        // Filter opsional: status ('Pending', 'Disetujui', 'Ditolak')
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        // Filter opsional: berdasarkan ruangan tertentu (`room_id`)
+        if ($request->filled('room_id')) {
+            $query->where('room_id', $request->input('room_id'));
+        }
+
+        // Filter opsional: berdasarkan tanggal spesifik (`date`) atau bulan (`month` format YYYY-MM)
+        if ($request->filled('date')) {
+            $query->whereDate('event_date', $request->input('date'));
+        } elseif ($request->filled('month')) {
+            $month = Carbon::parse($request->input('month'))->startOfMonth();
+            $query->whereBetween('event_date', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()]);
+        }
+
+        // Urutkan dari tanggal agenda terbaru lalu jam mulai paling awal, dengan pagination
+        $events = $query->orderByDesc('event_date')->orderBy('start_time')->paginate($request->input('per_page', 20));
+
+        return $this->sendResponse([
+            'items' => EventResource::collection($events->items()),
+            'pagination' => [
+                'current_page' => $events->currentPage(),
+                'last_page' => $events->lastPage(),
+                'per_page' => $events->perPage(),
+                'total' => $events->total(),
+            ],
+        ], 'Daftar agenda peminjaman berhasil dimuat.');
+    }
+
+    /**
+     * Submit a new room booking request (Guru, Organisasi, Admin).
+     */
+    // Endpoint: POST /api/events
+    // Mengajukan peminjaman ruangan baru
+    public function store(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $roleName = $user->role?->role_name;
+
+        // Aturan Bisnis: PIC tidak mengajukan peminjaman ruangan (hanya memverifikasi pengajuan di ruangannya)
+        // Jika ingin agar PIC juga bisa meminjam ruangan, tambahkan 'PIC' ke array di bawah.
+        if (! in_array($roleName, ['Admin', 'Guru', 'Organisasi'], true)) {
+            return $this->sendError('PIC tidak memiliki hak akses untuk mengajukan agenda peminjaman ruangan.', null, 403);
+        }
+
+        // Ambil daftar jam sesi reguler (Sesi 1-14, maksimal sampai 17:00). Hanya Admin yang boleh memilih jam bebas di atas 17:00.
+        $sessionTimes = $this->regularSessionTimes();
+        $canUseFreeTime = $roleName === 'Admin';
+
+        // Validasi input pengajuan agenda
+        // 
+        // - `'after:today'` mewajibkan peminjaman minimal H-1 (besok). Jika ingin mengizinkan peminjaman di hari yang sama (hari H),
+        //   ubah `'after:today'` menjadi `'after_or_equal:today'`.
+        // - Jika Guru/Organisasi diizinkan memilih jam bebas di luar sesi 1-14, ubah `$canUseFreeTime = true;` di atas.
+        $validator = Validator::make($request->all(), [
+            'room_id' => ['required', 'exists:rooms,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'event_date' => ['required', 'date', 'after:today'],
+            'start_time' => [
+                'required',
+                'date_format:H:i',
+                function (string $attribute, mixed $value, \Closure $fail) use ($sessionTimes, $canUseFreeTime): void {
+                    if (! in_array($value, $sessionTimes, true) && (! $canUseFreeTime || $value <= '17:00')) {
+                        $fail($canUseFreeTime
+                            ? 'Pilih sesi 1–14 atau waktu bebas setelah pukul 17.00.'
+                            : 'Guru dan Organisasi hanya dapat memilih sesi 1–14, paling lambat pukul 17.00.');
+                    }
+                },
+            ],
+            'end_time' => [
+                'required',
+                'date_format:H:i',
+                'after:start_time',
+                function (string $attribute, mixed $value, \Closure $fail) use ($sessionTimes, $canUseFreeTime): void {
+                    if (! in_array($value, $sessionTimes, true) && (! $canUseFreeTime || $value <= '17:00')) {
+                        $fail($canUseFreeTime
+                            ? 'Pilih sesi 1–14 atau waktu bebas setelah pukul 17.00.'
+                            : 'Guru dan Organisasi hanya dapat memilih sesi 1–14, paling lambat pukul 17.00.');
+                    }
+                },
+            ],
+        ], [
+            'event_date.after' => 'Tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
+            'end_time.after' => 'Jam selesai harus setelah jam mulai.',
+            'room_id.exists' => 'Ruangan yang dipilih tidak valid.',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validasi gagal.', $validator->errors(), 422);
+        }
+
+        $data = $validator->validated();
+
+        // Enforce conflict prevention
+        // Cek apakah ruangan sudah dipesan oleh agenda lain (yang berstatus Pending atau Disetujui) pada tanggal & jam yang beririsan
+        if ($this->hasConflict((int) $data['room_id'], $data['event_date'], $data['start_time'], $data['end_time'])) {
+            return $this->sendError('Ruangan sudah digunakan pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.', [
+                'room_id' => ['Ruangan sudah dipesan pada waktu ini.'],
+            ], 422);
+        }
+
+        // Jika yang membuat adalah Admin, status otomatis 'Disetujui'. Jika Guru/Organisasi, status awal adalah 'Pending'.
+        $status = $roleName === 'Admin' ? 'Disetujui' : 'Pending';
+        $event = Event::create($data + [
+            'user_id' => $user->id,
+            'status' => $status,
+            'approved_by' => $roleName === 'Admin' ? $user->id : null,
+        ]);
+
+        // If submitted by Guru/Organisasi, optionally notify the room's PIC
+        // Kirim notifikasi ke PIC ruangan bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
+        if ($status === 'Pending') {
+            $room = Room::find($data['room_id']);
+            if ($room && $room->pic_id) {
+                Notification::create([
+                    'event_id' => $event->id,
+                    'user_id' => $room->pic_id,
+                    'message' => "Pengajuan peminjaman ruangan {$room->room_name} baru dari {$user->name}: {$event->title}.",
+                ]);
+            }
+        }
+
+        $message = $roleName === 'Admin'
+            ? 'Agenda berhasil dibuat dan langsung disetujui.'
+            : 'Agenda berhasil diajukan dan menunggu persetujuan PIC.';
+
+        return $this->sendResponse(
+            new EventResource($event->load(['room.pic', 'user'])),
+            $message,
+            201,
+        );
+    }
+
+    /**
+     * Get detail of a specific event.
+     */
+    // Endpoint: GET /api/events/{event}
+    // Menampilkan detail satu agenda peminjaman ruangan
+    public function show(Request $request, Event $event): JsonResponse
+    {
+        $user = $request->user();
+        $role = $user->role?->role_name;
+
+        // Agenda yang sudah 'Disetujui' boleh dilihat siapa saja; jika belum disetujui, hanya Admin, PIC ruangan tersebut, atau pengaju asli yang boleh melihat
+        $canView = $event->status === 'Disetujui'
+            || $role === 'Admin'
+            || ($role === 'PIC' && $event->room()->where('pic_id', $user->id)->exists())
+            || ($event->user_id === $user->id);
+
+        if (! $canView) {
+            return $this->sendError('Anda tidak memiliki akses ke detail agenda ini.', null, 403);
+        }
+
+        $event->load(['room.pic', 'user', 'approver']);
+
+        return $this->sendResponse(
+            new EventResource($event),
+            'Detail agenda berhasil dimuat.',
+        );
+    }
+
+    /**
+     * Approve or reject a pending booking (PIC or Admin).
+     */
+    // Endpoint: PATCH /api/events/{event}/decide
+    // Memproses keputusan persetujuan ('Disetujui') atau penolakan ('Ditolak') oleh PIC ruangan atau Admin
+    public function decide(Request $request, Event $event): JsonResponse
+    {
+        $user = $request->user();
+        $role = $user->role?->role_name;
+
+        // Pastikan user yang memproses adalah Admin atau PIC yang bertanggung jawab atas ruangan agenda ini
+        $isRoomPic = $role === 'PIC' && $event->room()->where('pic_id', $user->id)->exists();
+        if ($role !== 'Admin' && ! $isRoomPic) {
+            return $this->sendError('Anda bukan PIC dari ruangan agenda ini.', null, 403);
+        }
+
+        // Bagi PIC, hanya agenda yang masih berstatus 'Pending' yang boleh diubah keputusannya
+        if ($role !== 'Admin' && $event->status !== 'Pending') {
+            return $this->sendError('Hanya agenda yang berstatus Pending yang dapat diproses.', null, 422);
+        }
+
+        // Validasi input keputusan: jika ditolak ('Ditolak'), alasan penolakan (`rejection_reason`) wajib diisi
+        $validator = Validator::make($request->all(), [
+            'status' => ['required', 'in:Disetujui,Ditolak'],
+            'rejection_reason' => ['required_if:status,Ditolak', 'nullable', 'string', 'max:1000'],
+        ], [
+            'rejection_reason.required_if' => 'Keterangan alasan penolakan wajib diisi jika status Ditolak.',
+            'rejection_reason.max' => 'Keterangan penolakan maksimal 1000 karakter.',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validasi gagal.', $validator->errors(), 422);
+        }
+
+        $data = $validator->validated();
+
+        // Jika akan disetujui, cek sekali lagi apakah ada bentrok jadwal dengan agenda lain di ruangan dan waktu yang sama
+        if ($data['status'] === 'Disetujui') {
+            $eventDate = Carbon::parse($event->event_date)->toDateString();
+            if ($this->hasConflict((int) $event->room_id, $eventDate, $event->start_time, $event->end_time, $event->id)) {
+                return $this->sendError('Tidak dapat menyetujui karena ada bentrok jadwal dengan agenda lain pada ruangan dan waktu tersebut.', null, 422);
+            }
+        }
+
+        $reason = $data['status'] === 'Ditolak' ? trim((string) $data['rejection_reason']) : null;
+
+        // Simpan perubahan status, ID pemberi persetujuan (`approved_by`), dan alasan penolakan (jika ditolak)
+        $event->update([
+            'status' => $data['status'],
+            'approved_by' => $data['status'] === 'Disetujui' ? $user->id : null,
+            'rejection_reason' => $reason,
+        ]);
+
+        // Kirimkan notifikasi hasil keputusan (Disetujui / Ditolak beserta alasannya) kepada pemohon agenda
+        if ($data['status'] === 'Ditolak' && ! blank($reason)) {
+            Notification::create([
+                'event_id' => $event->id,
+                'user_id' => $event->user_id,
+                'message' => "Pengajuan agenda {$event->title} ditolak. Alasan: {$reason}",
+            ]);
+        } elseif ($data['status'] === 'Disetujui') {
+            Notification::create([
+                'event_id' => $event->id,
+                'user_id' => $event->user_id,
+                'message' => "Pengajuan agenda {$event->title} di {$event->room->room_name} telah disetujui.",
+            ]);
+        }
+
+        return $this->sendResponse(
+            new EventResource($event->fresh(['room.pic', 'user', 'approver'])),
+            "Status agenda berhasil diperbarui menjadi {$data['status']}.",
+        );
+    }
+
+    /**
+     * Check if a room is available for the given date and time range.
+     */
+    // Endpoint: GET /api/events/check-availability
+    // Mengecek secara real-time apakah suatu ruangan kosong (available) pada tanggal dan rentang jam tertentu
+    public function checkAvailability(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'room_id' => ['required', 'exists:rooms,id'],
+            'event_date' => ['required', 'date'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+            'ignore_event_id' => ['nullable', 'integer'],
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Parameter tidak valid.', $validator->errors(), 422);
+        }
+
+        $data = $validator->validated();
+        $conflict = $this->hasConflict(
+            (int) $data['room_id'],
+            $data['event_date'],
+            $data['start_time'],
+            $data['end_time'],
+            isset($data['ignore_event_id']) ? (int) $data['ignore_event_id'] : null,
+        );
+
+        return $this->sendResponse([
+            'available' => ! $conflict,
+            'room_id' => (int) $data['room_id'],
+            'event_date' => $data['event_date'],
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'message' => $conflict ? 'Ruangan tidak tersedia pada waktu tersebut.' : 'Ruangan tersedia.',
+        ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    // Mengambil daftar jam sesi reguler (di mana `is_free = false`) dalam format array string 'HH:MM'
+    private function regularSessionTimes(): array
+    {
+        return SessionTime::where('is_free', false)
+            ->orderBy('time')
+            ->get()
+            ->map(fn (SessionTime $s) => substr($s->time, 0, 5))
+            ->all();
+    }
+
+    /**
+     * Check if room booking conflicts with another pending or approved event.
+     */
+    // Logika inti pendeteksi bentrok jadwal (Time Overlap):
+    // Dua rentang waktu [startA, endA] dan [startB, endB] beririsan (bentrok) jika `start_time < $end` DAN `end_time > $start`.
+    // Agenda yang sudah 'Ditolak' diabaikan (tidak dianggap menghalangi peminjaman baru).
+    private function hasConflict(int $roomId, string $date, string $start, string $end, ?int $ignoreId = null): bool
+    {
+        return Event::where('room_id', $roomId)
+            ->whereDate('event_date', $date)
+            ->whereIn('status', ['Pending', 'Disetujui'])
+            ->where('start_time', '<', $end)
+            ->where('end_time', '>', $start)
+            ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
+            ->exists();
+    }
+}
+
