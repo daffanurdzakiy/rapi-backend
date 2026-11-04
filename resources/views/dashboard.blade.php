@@ -36,6 +36,12 @@
     .dashboard-page .dashboard-date { color: #46566d; }
     .dashboard-page .stat b,
     .dashboard-page .stat-alert b { color: var(--dashboard-navy-deep); }
+    .dashboard-page .stat b {
+        display: block;
+        font-size: 70px;
+        font-weight: 800;
+        line-height: 1;
+    }
     .dashboard-page .stat::after {
         display: none;
     }
@@ -77,6 +83,7 @@
     .dashboard-page .notice a { color: #465a73; }
     @media (max-width: 760px) {
         .dashboard-page { padding: 16px; }
+        .dashboard-page .stat b { font-size: 36px; }
     }
 </style>
 <div class="dashboard-page">
