@@ -22,7 +22,13 @@ class PicComplaintReportController extends Controller
         );
         abort_unless($complaint->photo_path && Storage::disk('public')->exists($complaint->photo_path), 404);
 
-        return Storage::disk('public')->response($complaint->photo_path);
+        $disk = Storage::disk('public');
+
+        return $disk->response(
+            $complaint->photo_path,
+            headers: ['Content-Type' => $disk->mimeType($complaint->photo_path)],
+            disposition: 'inline',
+        );
     }
 
     // Menyaring data pengaduan di ruangan milik PIC berdasarkan periode (harian, mingguan, atau bulanan).

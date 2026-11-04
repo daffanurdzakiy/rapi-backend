@@ -1,6 +1,6 @@
 @php
     $today = now()->toDateString();
-    $overflowDays = $events->filter(fn ($dayEvents) => $dayEvents->count() > 2);
+    $daysWithEvents = $events->filter(fn ($dayEvents) => $dayEvents->isNotEmpty());
 @endphp
 
 <div class="calendar-page">
@@ -35,7 +35,17 @@
                         $dialogId = 'agenda-'.str_replace('-', '', $dateKey);
                     @endphp
                     <article class="calendar-day {{ $date->month !== $month->month ? 'outside-month' : '' }} {{ $dateKey === $today ? 'today' : '' }}">
-                        <span class="day-number">{{ $date->day }}</span>
+                        @if($dayEvents->isNotEmpty())
+                            <button
+                                class="day-number"
+                                type="button"
+                                data-dialog="{{ $dialogId }}"
+                                aria-label="{{ $date->locale('id')->translatedFormat('l, d F Y') }}, {{ $dayEvents->count() }} agenda"
+                            >{{ $date->day }}</button>
+                            <span class="day-event-indicator" aria-hidden="true"></span>
+                        @else
+                            <span class="day-number">{{ $date->day }}</span>
+                        @endif
                         @foreach($dayEvents->take(2) as $event)
                             <div class="agenda-chip" title="{{ substr($event->start_time, 0, 5) }}–{{ substr($event->end_time, 0, 5) }} · {{ $event->room->room_name }} · {{ $event->title }}">
                                 <span class="agenda-time">{{ substr($event->start_time, 0, 5) }}–{{ substr($event->end_time, 0, 5) }}</span>
@@ -52,7 +62,7 @@
     </section>
 </div>
 
-@include('calendar.dialogs')
+@include('calendar.dialogs', ['daysWithEvents' => $daysWithEvents])
 
 <script>
     document.querySelectorAll('[data-dialog]').forEach(function (button) {

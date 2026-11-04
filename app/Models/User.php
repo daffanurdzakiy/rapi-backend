@@ -17,6 +17,10 @@ use Laravel\Sanctum\HasApiTokens;
 // =========================================================================
 // Merepresentasikan tabel `users`. Menggunakan PHP Attributes #[Fillable] dan #[Hidden] bawaan Laravel modern.
 // Jika menambah kolom baru pada tabel `users` (misal: 'nip' atau 'phone'), tambahkan ke dalam #[Fillable([...])].
+/**
+ * @property int $id
+ * @property string $name
+ */
 #[Fillable(['name', 'email', 'whatsapp', 'password', 'role_id'])]
 // Menyembunyikan atribut sensitif (`password` dan `remember_token`) agar tidak ikut terekspos saat objek User diubah menjadi JSON
 #[Hidden(['password', 'remember_token'])]

@@ -1,4 +1,4 @@
-@foreach($overflowDays as $dateKey => $dayEvents)
+@foreach($daysWithEvents as $dateKey => $dayEvents)
     <dialog class="agenda-dialog" id="agenda-{{ str_replace('-', '', $dateKey) }}" aria-labelledby="heading-{{ str_replace('-', '', $dateKey) }}">
         <div class="dialog-heading">
             <div>

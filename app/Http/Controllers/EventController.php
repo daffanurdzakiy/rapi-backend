@@ -300,12 +300,12 @@ class EventController extends Controller
             ->all();
     }
 
-    /** Enforce UKK conflict prevention for pending and approved bookings in one room. */
+    /** Prevent overlapping bookings only when the existing booking is approved. */
     // Logika Anti-Bentrok Jadwal Ruangan.
-    // Mengecek apakah di ruangan & tanggal yang sama sudah ada agenda 'Pending' atau 'Disetujui' yang jamnya beririsan.
+    // Hanya agenda 'Disetujui' yang beririsan yang menghalangi penggunaan ruangan.
     private function ensureAvailable(int $roomId, string $date, string $start, string $end, ?int $ignoreId = null): void
     {
-        $conflict = Event::where('room_id', $roomId)->whereDate('event_date', $date)->whereIn('status', ['Pending', 'Disetujui'])->where('start_time', '<', $end)->where('end_time', '>', $start)->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))->exists();
+        $conflict = Event::where('room_id', $roomId)->whereDate('event_date', $date)->where('status', 'Disetujui')->where('start_time', '<', $end)->where('end_time', '>', $start)->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))->exists();
         if ($conflict) {
             throw ValidationException::withMessages(['room_id' => 'Ruangan sudah digunakan pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.']);
         }

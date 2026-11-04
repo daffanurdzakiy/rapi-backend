@@ -119,7 +119,7 @@ class ApiTest extends TestCase
             ->assertUnauthorized();
     }
 
-    public function test_guru_and_organisasi_can_propose_event_and_conflict_is_prevented(): void
+    public function test_pending_bookings_do_not_block_but_approved_bookings_prevent_conflicts(): void
     {
         $pic = $this->userWithRole('PIC');
         $room = Room::create([
@@ -147,10 +147,24 @@ class ApiTest extends TestCase
             ->assertJsonPath('data.status', 'Pending')
             ->assertJsonPath('data.title', 'LDK OSIS 2026');
 
-        // Attempt overlapping booking (09:30 to 11:00)
-        $conflictResponse = $this->authenticateWithToken($token)->postJson('/api/events', [
+        // A pending booking does not block another proposal for the same time.
+        $pendingResponse = $this->authenticateWithToken($token)->postJson('/api/events', [
             'room_id' => $room->id,
             'title' => 'Seminar PMR',
+            'event_date' => $date,
+            'start_time' => '09:30',
+            'end_time' => '11:00',
+        ]);
+
+        $pendingResponse->assertCreated()
+            ->assertJsonPath('data.status', 'Pending');
+
+        Event::whereKey(data_get($createResponse->json(), 'data.id'))
+            ->update(['status' => 'Disetujui']);
+
+        $conflictResponse = $this->authenticateWithToken($token)->postJson('/api/events', [
+            'room_id' => $room->id,
+            'title' => 'Rapat Kesiswaan',
             'event_date' => $date,
             'start_time' => '09:30',
             'end_time' => '11:00',
@@ -257,6 +271,11 @@ class ApiTest extends TestCase
         $statusResponse->assertOk()
             ->assertJsonPath('data.status_repair', 'Menunggu Spare Part');
 
+        $this->authenticateWithToken($picToken)
+            ->get("/api/complaints/{$complaintId}/photo")
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg');
+
         // Reporter receives notification
         $this->assertDatabaseHas('notifications', [
             'user_id' => $guru->id,
@@ -281,7 +300,6 @@ class ApiTest extends TestCase
         ]);
 
         $guru = $this->userWithRole('Guru');
-
         $picToken = $pic->createToken('pic_token')->plainTextToken;
         $guruToken = $guru->createToken('guru_token')->plainTextToken;
 
@@ -319,4 +337,3 @@ class ApiTest extends TestCase
         ], $attributes));
     }
 }
-

@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 // MODEL ELOQUENT: ROOM (DATA RUANGAN)
 // =========================================================================
 // Merepresentasikan tabel `rooms` di database yang menyimpan informasi ruangan beserta PIC penanggung jawabnya.
+/**
+ * @property int $id
+ * @property string $room_name
+ */
 class Room extends Model
 {
     // Kolom-kolom tabel `rooms` yang diizinkan untuk diisi secara massal (Mass Assignment)

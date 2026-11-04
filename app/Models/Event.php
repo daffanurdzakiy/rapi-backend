@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 // MODEL ELOQUENT: EVENT (AGENDA / PEMINJAMAN RUANGAN)
 // =========================================================================
 // Merepresentasikan tabel `events` di database yang mencatat jadwal peminjaman ruangan.
+/**
+ * @property int $id
+ */
 class Event extends Model
 {
     // Daftar atribut/kolom yang boleh diisi secara massal (Mass Assignment)

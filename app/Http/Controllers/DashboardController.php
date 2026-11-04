@@ -56,11 +56,27 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        // Mengirimkan data kartu statistik ke view dashboard.blade.php.
+        $featuredRoomSchedules = collect(['Wijaya', 'Dak'])->mapWithKeys(function (string $roomName) {
+            $room = Room::query()
+                ->where('room_name', 'like', "%{$roomName}%")
+                ->with(['events' => fn ($query) => $query
+                    ->whereDate('event_date', today())
+                    ->whereIn('status', ['Pending', 'Disetujui'])
+                    ->orderBy('start_time')])
+                ->first();
+
+            return [$roomName => [
+                'name' => $room?->room_name ?? "Ruang {$roomName}",
+                'exists' => $room !== null,
+                'events' => $room?->events ?? collect(),
+            ]];
+        });
+
         return view('dashboard', [
             'roomCount' => $role === 'PIC' ? $assignedRooms->count() : Room::count(),
             'assignedRooms' => $assignedRooms,
-            'todayEvents' => Event::whereDate('event_date', today())->whereIn('status', ['Pending', 'Disetujui'])->count(),
+            'featuredRoomSchedules' => $featuredRoomSchedules,
+            'todayEvents' => Event::whereDate('event_date', today())->count(),
             'pendingComplaints' => (clone $complaints)->where('status_repair', 'Belum Diperbaiki')->count(),
             'recentEvents' => $recentEvents,
             'notifications' => $notifications,

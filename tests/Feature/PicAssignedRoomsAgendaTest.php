@@ -102,17 +102,102 @@ class PicAssignedRoomsAgendaTest extends TestCase
             'end_time' => '09:00',
             'status' => 'Pending',
         ]);
+        Event::create([
+            'user_id' => $pic->id,
+            'room_id' => $assignedRoom->id,
+            'title' => 'Agenda ditolak hari ini',
+            'event_date' => today()->toDateString(),
+            'start_time' => '10:00',
+            'end_time' => '11:00',
+            'status' => 'Ditolak',
+        ]);
 
         $this->actingAs($pic)
             ->get(route('dashboard'))
             ->assertOk()
+            ->assertViewIs('dashboard')
+            ->assertViewHas('todayEvents', 1)
             ->assertSee('Agenda Terkini')
             ->assertSee('Agenda Terkini PIC')
+            ->assertSee('class="stat-value"', false)
+            ->assertSee('font-size: 72px !important;')
+            ->assertSee('font-size: 56px !important;')
             ->assertSee('Daftar Ruangan Tanggung Jawab')
             ->assertSee('RUANGAN TANGGUNG JAWAB')
+            ->assertSee('Jumlah agenda pada hari ini')
+            ->assertDontSee('Pending dan disetujui')
             ->assertSee($assignedRoom->room_name)
             ->assertDontSee('Ruang PIC Lain')
             ->assertDontSee('Aksi Cepat');
+    }
+
+    public function test_legacy_dashboard_view_name_renders_without_new_schedule_data(): void
+    {
+        $pic = $this->userWithRole('PIC');
+        $response = $this->actingAs($pic)
+            ->get(route('dashboard'))
+            ->assertOk();
+        $viewData = $response->viewData();
+        unset($viewData['featuredRoomSchedules']);
+
+        $html = view('dashboard', $viewData)->render();
+
+        $this->assertStringContainsString('Selamat datang', $html);
+    }
+
+    public function test_featured_room_schedules_are_shown_to_all_dashboard_roles(): void
+    {
+        $pic = $this->userWithRole('PIC');
+        $wijayaRoom = $this->roomFor($pic, 'Ruang Wijaya');
+        $dakRoom = $this->roomFor($pic, 'Ruang Dak');
+        $requester = $this->userWithRole('Guru');
+
+        Event::create([
+            'user_id' => $requester->id,
+            'room_id' => $wijayaRoom->id,
+            'title' => 'Rapat Wijaya Hari Ini',
+            'event_date' => today()->toDateString(),
+            'start_time' => '08:00',
+            'end_time' => '09:30',
+            'status' => 'Disetujui',
+        ]);
+        Event::create([
+            'user_id' => $requester->id,
+            'room_id' => $dakRoom->id,
+            'title' => 'Agenda Ditolak Dak',
+            'event_date' => today()->toDateString(),
+            'start_time' => '10:00',
+            'end_time' => '11:00',
+            'status' => 'Ditolak',
+        ]);
+        Event::create([
+            'user_id' => $requester->id,
+            'room_id' => $dakRoom->id,
+            'title' => 'Agenda Dak Besok',
+            'event_date' => today()->addDay()->toDateString(),
+            'start_time' => '10:00',
+            'end_time' => '11:00',
+            'status' => 'Disetujui',
+        ]);
+
+        foreach (['Admin', 'PIC', 'Guru', 'Organisasi'] as $roleName) {
+            $user = $roleName === 'PIC' ? $pic : $this->userWithRole($roleName);
+
+            $this->actingAs($user)
+                ->get(route('dashboard'))
+                ->assertOk()
+                ->assertSee('Ruang Wijaya')
+                ->assertSee('Rapat Wijaya Hari Ini')
+                ->assertSee('08:00–09:30')
+                ->assertSee('Ruang Dak')
+                ->assertSee('KOSONG')
+                ->assertSee('Belum ada agenda untuk hari ini.')
+                ->assertDontSee('Agenda Ditolak Dak')
+                ->assertViewHas('featuredRoomSchedules', fn ($schedules) =>
+                    $schedules['Wijaya']['events']->pluck('title')->contains('Rapat Wijaya Hari Ini')
+                    && $schedules['Dak']['events']->isEmpty()
+                );
+        }
     }
 
     public function test_pic_can_decide_agenda_for_assigned_room_but_cannot_edit_or_submit_agendas(): void

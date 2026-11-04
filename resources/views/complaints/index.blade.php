@@ -13,8 +13,8 @@
 
     <div class="card">
         @forelse($complaints as $complaint)
-            <div class="list">
-                <div class="heading">
+            <div class="list complaint-item">
+                <div class="heading complaint-heading">
                     <div>
                         <h3>{{ $complaint->room->room_name }}</h3>
                         <p>
@@ -24,12 +24,12 @@
                             </span>
                         </p>
                     </div>
-                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex-shrink:0">
+                    <div class="complaint-side">
                         <span class="badge {{ $complaint->status_repair === 'Belum Diperbaiki' ? 'bad' : '' }}">
                             {{ $complaint->status_repair }}
                         </span>
                         @if($complaint->photo_path)
-                            @php($photoUrl = route('complaints.show-photo', $complaint))
+                            @php($photoUrl = route('complaints.show-photo', $complaint, false))
                             <a href="{{ $photoUrl }}" target="_blank" rel="noopener" aria-label="Buka foto pengaduan ukuran penuh">
                                 <img
                                     src="{{ $photoUrl }}"

@@ -94,7 +94,7 @@
                         <td>{{ $complaint->status_repair }}</td>
                         <td class="evidence-column">
                             @if($complaint->photo_path)
-                                <a href="{{ route('pic.complaint-reports.photo', $complaint) }}" target="_blank" rel="noopener">Lihat foto</a>
+                                <a href="{{ route('pic.complaint-reports.photo', $complaint, false) }}" target="_blank" rel="noopener">Lihat foto</a>
                             @else
                                 <span class="muted">Tidak ada foto</span>
                             @endif

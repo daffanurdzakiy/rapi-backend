@@ -226,6 +226,73 @@ class EventSessionTimeTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_move_to_room_with_pending_booking_but_not_approved_booking(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $applicant = $this->userWithRole('Guru');
+        $sourceRoom = $this->room('Ruang Asal');
+        $targetRoom = $this->room('Ruang Tujuan');
+        $eventDate = now()->addDay()->toDateString();
+        $event = Event::create([
+            'user_id' => $applicant->id,
+            'room_id' => $sourceRoom->id,
+            'title' => 'Agenda yang Dipindahkan',
+            'event_date' => $eventDate,
+            'start_time' => '09:30',
+            'end_time' => '10:15',
+            'status' => 'Disetujui',
+        ]);
+        $targetEvent = Event::create([
+            'user_id' => $applicant->id,
+            'room_id' => $targetRoom->id,
+            'title' => 'Agenda di Ruang Tujuan',
+            'event_date' => $eventDate,
+            'start_time' => '11:00',
+            'end_time' => '11:45',
+            'status' => 'Pending',
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('events.update', $event), [
+                'room_id' => $targetRoom->id,
+                'start_time' => '11:00',
+                'end_time' => '11:45',
+                'move_reason' => 'Agenda sebelumnya masih menunggu persetujuan.',
+            ])
+            ->assertRedirect(route('events.index'));
+
+        $this->assertDatabaseHas('events', [
+            'id' => $event->id,
+            'room_id' => $targetRoom->id,
+            'start_time' => '11:00',
+            'end_time' => '11:45',
+        ]);
+
+        $event->refresh()->update([
+            'room_id' => $sourceRoom->id,
+            'start_time' => '09:30',
+            'end_time' => '10:15',
+        ]);
+        $targetEvent->update(['status' => 'Disetujui']);
+
+        $this->from(route('events.edit', $event))
+            ->put(route('events.update', $event), [
+                'room_id' => $targetRoom->id,
+                'start_time' => '11:00',
+                'end_time' => '11:45',
+                'move_reason' => 'Ruangan tujuan sudah disetujui untuk agenda lain.',
+            ])
+            ->assertRedirect(route('events.edit', $event))
+            ->assertSessionHasErrors(['room_id']);
+
+        $this->assertDatabaseHas('events', [
+            'id' => $event->id,
+            'room_id' => $sourceRoom->id,
+            'start_time' => '09:30',
+            'end_time' => '10:15',
+        ]);
+    }
+
     public function test_only_admin_can_edit_an_agenda(): void
     {
         $teacher = $this->userWithRole('Guru');

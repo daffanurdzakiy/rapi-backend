@@ -90,6 +90,9 @@
         .room-actions form { margin: 0; }
         .list { padding: 16px 0; border-top: 1px solid #e8e1d3; }
         .list:first-child { border-top: 0; }
+        .complaint-item h3 { margin: 0 0 8px; }
+        .complaint-item .complaint-heading p { margin: 7px 0 0; }
+        .complaint-side { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 12px; }
         .badge { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 4px 10px; border: 1px solid #d7deea; border-radius: 99px; background: #f1f3f6; color: #35465e; font-size: 11px; font-weight: 700; white-space: nowrap; }
         .badge.pending, .badge.bad { border-color: #d9d1bf; background: #f7f4eb; color: #35465e; }
         table { width: 100%; border-collapse: collapse; color: var(--text); }
@@ -237,6 +240,9 @@
             .heading { flex-wrap: wrap; }
             .heading h1 { font-size: 24px; }
             .heading p { margin-bottom: 16px; }
+            .complaint-heading { flex-direction: column; gap: 12px; }
+            .complaint-side { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 10px; }
+            .complaint-item .complaint-heading p { margin-bottom: 0; }
             .report-table-wrap, .card:has(> table) { overflow-x: auto; }
             table { min-width: 620px; font-size: 13px; }
             .dashboard-date { padding: 0 0 12px; }
@@ -305,6 +311,10 @@
             <a href="{{ route('complaints.index') }}" class="{{ request()->routeIs('complaints.*') ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                 <span>Pengaduan</span>
+            </a>
+            <a href="{{ route('calendar') }}" class="{{ request()->routeIs('calendar') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>Kalender</span>
             </a>
             @if($currentRole === 'Admin')
             <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.*') ? 'active' : '' }}">

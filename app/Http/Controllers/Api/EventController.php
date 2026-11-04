@@ -138,8 +138,7 @@ class EventController extends ApiController
 
         $data = $validator->validated();
 
-        // Enforce conflict prevention
-        // Cek apakah ruangan sudah dipesan oleh agenda lain (yang berstatus Pending atau Disetujui) pada tanggal & jam yang beririsan
+        // Hanya agenda berstatus Disetujui yang menghalangi penggunaan ruangan.
         if ($this->hasConflict((int) $data['room_id'], $data['event_date'], $data['start_time'], $data['end_time'])) {
             return $this->sendError('Ruangan sudah digunakan pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.', [
                 'room_id' => ['Ruangan sudah dipesan pada waktu ini.'],
@@ -332,20 +331,19 @@ class EventController extends ApiController
     }
 
     /**
-     * Check if room booking conflicts with another pending or approved event.
+     * Check if room booking conflicts with another approved event.
      */
     // Logika inti pendeteksi bentrok jadwal (Time Overlap):
     // Dua rentang waktu [startA, endA] dan [startB, endB] beririsan (bentrok) jika `start_time < $end` DAN `end_time > $start`.
-    // Agenda yang sudah 'Ditolak' diabaikan (tidak dianggap menghalangi peminjaman baru).
+    // Agenda Pending dan Ditolak tidak dianggap menghalangi peminjaman baru.
     private function hasConflict(int $roomId, string $date, string $start, string $end, ?int $ignoreId = null): bool
     {
         return Event::where('room_id', $roomId)
             ->whereDate('event_date', $date)
-            ->whereIn('status', ['Pending', 'Disetujui'])
+            ->where('status', 'Disetujui')
             ->where('start_time', '<', $end)
             ->where('end_time', '>', $start)
             ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
             ->exists();
     }
 }
-

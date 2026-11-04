@@ -109,10 +109,11 @@ class PicComplaintReportTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('Lihat foto')
-            ->assertSee(route('pic.complaint-reports.photo', $complaint));
+            ->assertSee(route('pic.complaint-reports.photo', $complaint, false));
 
         $this->get(route('pic.complaint-reports.photo', $complaint))
             ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg')
             ->assertStreamedContent('foto-bukti');
     }
 

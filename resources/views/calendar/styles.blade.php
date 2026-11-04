@@ -79,6 +79,9 @@
     .calendar-day.outside-month .day-number { color: #c0c9dd; }
     .calendar-day.today { background: linear-gradient(145deg, #f3f6ff, #fff); }
     .day-number { display: inline-grid; min-width: 23px; height: 23px; place-items: center; margin: 0 0 4px; border-radius: 50%; color: #26366c; font-size: 11px; font-weight: 700; }
+    button.day-number { padding: 0; border: 0; background: transparent; cursor: pointer; font-family: inherit; }
+    button.day-number:focus-visible { outline: 2px solid #667b99; outline-offset: 2px; }
+    .day-event-indicator { display: none; }
     .today .day-number { background: #315cff; color: #fff; box-shadow: 0 3px 8px #315cff40; }
     .agenda-chip {
         display: block;
@@ -198,4 +201,35 @@
     .dialog-heading, .dialog-event { border-color: #e8e1d3; }
     .dialog-close { background: #f1f3f6; color: #35465e; }
     .dialog-close:hover { background: #e8edf4; }
+    @media (max-width: 760px) {
+        .public-wrap { width: calc(100% - 24px); padding-top: 20px; }
+        .calendar-page-heading h1 { font-size: 24px; }
+        .calendar-page-heading p { font-size: 14px; }
+        .calendar-card { padding: 12px; }
+        .calendar-toolbar {
+            align-items: center;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .month-title { font-size: clamp(16px, 5vw, 19px); white-space: nowrap; }
+        .calendar-controls { align-self: auto; gap: 5px; margin-top: 0; }
+        .calendar-control { min-width: 34px; height: 34px; padding: 0 8px; }
+        .calendar-control.today { font-size: 11px; }
+        .calendar-scroll { overflow: hidden; }
+        .calendar-weekdays, .calendar-grid { min-width: 0; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+        .calendar-weekdays span { padding: 9px 1px; font-size: 9px; letter-spacing: 0; text-align: center; }
+        .calendar-day {
+            display: flex;
+            min-height: clamp(54px, 17vw, 72px);
+            flex-direction: column;
+            align-items: center;
+            padding: 5px 1px;
+        }
+        .day-number { min-width: 21px; height: 21px; margin-bottom: 0; }
+        .day-event-indicator { display: block; width: 5px; height: 5px; margin-top: 4px; border-radius: 50%; background: #667b99; }
+        .agenda-chip, .calendar-more { display: none; }
+    }
 </style>

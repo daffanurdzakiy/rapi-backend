@@ -43,7 +43,7 @@
                 <form method="POST" action="{{ route('password.email') }}">
                     @csrf
                     <label for="email">Email</label>
-                    <input id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email" required autofocus>
+                    <input id="email" name="email" type="email" value="{{ old('email') }}" placeholder="daffa@gmail.com" autocomplete="email" required autofocus>
                     @error('email')<p class="error">{{ $message }}</p>@enderror
                     <button class="reset-submit" type="submit">Kirim Kode OTP</button>
                 </form>

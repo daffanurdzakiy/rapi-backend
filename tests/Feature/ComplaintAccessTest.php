@@ -211,34 +211,38 @@ class ComplaintAccessTest extends TestCase
             'photo_path' => 'complaints/evidence.jpg',
         ]);
 
+        $complaint = Complaint::query()->firstOrFail();
+        $photoUrl = route('complaints.show-photo', $complaint, false);
         $adminResponse = $this->actingAs($admin)
             ->withServerVariables(['HTTP_HOST' => '127.0.0.1:8000'])
             ->get(route('complaints.index'));
         $adminResponse->assertOk()
             ->assertSeeInOrder([
                 'Belum Diperbaiki',
-                'src="'.route('complaints.show-photo', Complaint::query()->firstOrFail()).'"',
+                'src="'.$photoUrl.'"',
             ], false)
-            ->assertSee('href="'.route('complaints.show-photo', Complaint::query()->firstOrFail()).'"', false)
+            ->assertSee('href="'.$photoUrl.'"', false)
             ->assertDontSee('Buat Pengaduan');
 
-        $this->get(route('complaints.show-photo', Complaint::query()->firstOrFail()))
+        $this->get(route('complaints.show-photo', $complaint))
             ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg')
+            ->assertHeader('content-disposition', 'inline; filename=evidence.jpg')
             ->assertStreamedContent('photo');
 
         $this->actingAs($reporter)
             ->get(route('complaints.index'))
             ->assertOk()
-            ->assertSee('src="'.route('complaints.show-photo', Complaint::query()->firstOrFail()).'"', false);
+            ->assertSee('src="'.$photoUrl.'"', false);
 
         $this->actingAs($pic)
             ->get(route('complaints.index'))
             ->assertOk()
-            ->assertSee('src="'.route('complaints.show-photo', Complaint::query()->firstOrFail()).'"', false);
+            ->assertSee('src="'.$photoUrl.'"', false);
 
         $otherPic = $this->userWithRole('PIC');
         $this->actingAs($otherPic)
-            ->get(route('complaints.show-photo', Complaint::query()->firstOrFail()))
+            ->get(route('complaints.show-photo', $complaint))
             ->assertForbidden();
     }
 
@@ -417,12 +421,13 @@ class ComplaintAccessTest extends TestCase
         $this->assertNotNull($complaint->photo_path);
         Storage::disk('public')->assertExists($complaint->photo_path);
 
-        $photoUrl = route('complaints.show-photo', $complaint);
+        $photoUrl = route('complaints.show-photo', $complaint, false);
         $this->actingAs($admin)->get(route('complaints.index'))
             ->assertOk()
             ->assertSee('src="'.$photoUrl.'"', false);
         $this->get($photoUrl)
             ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg')
             ->assertStreamedContent(file_get_contents(Storage::disk('public')->path($complaint->photo_path)));
 
         $this->actingAs($pic)->get(route('complaints.index'))
