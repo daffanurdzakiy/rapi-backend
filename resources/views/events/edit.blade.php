@@ -335,7 +335,7 @@
                 if (String(currentRoomId) !== String(originalRoomId)) {
                     alertBox.className = 'anti-bentrok-box is-available';
                     alertBox.innerHTML = '<div>' +
-                        '<strong>✓ Anti-Bentrok:</strong> Ruangan <b>' + roomName + '</b> <b>TERSEDIA</b> pada pukul ' + times.start + ' – ' + times.end + '. Siap dipindahkan dari ' + originalRoomName + '.' +
+                        'Ruangan <b>' + roomName + '</b> <b>TERSEDIA</b> pada pukul ' + times.start + ' – ' + times.end + '. Siap dipindahkan dari ' + originalRoomName + '.' +
                         '</div>';
                     alertBox.style.display = 'flex';
 
