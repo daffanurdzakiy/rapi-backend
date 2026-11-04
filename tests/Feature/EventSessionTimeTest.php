@@ -582,6 +582,99 @@ class EventSessionTimeTest extends TestCase
         ]);
     }
 
+    public function test_admin_edit_agenda_view_provides_anti_bentrok_data_and_all_room_options(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $applicant = $this->userWithRole('Guru');
+        $roomA = $this->room('Ruang A');
+        $roomB = $this->room('Ruang B');
+        $eventDate = now()->addDays(3)->toDateString();
+
+        $event = Event::create([
+            'user_id' => $applicant->id,
+            'room_id' => $roomA->id,
+            'title' => 'UKK RPL',
+            'event_date' => $eventDate,
+            'start_time' => '08:00',
+            'end_time' => '09:30',
+            'status' => 'Disetujui',
+        ]);
+
+        $conflictingEvent = Event::create([
+            'user_id' => $applicant->id,
+            'room_id' => $roomB->id,
+            'title' => 'Ujian Sertifikasi',
+            'event_date' => $eventDate,
+            'start_time' => '08:30',
+            'end_time' => '10:00',
+            'status' => 'Disetujui',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('events.edit', $event))
+            ->assertOk()
+            ->assertSee('Ruangan Pilihan / Tujuan')
+            ->assertSee('id="room_search"', false)
+            ->assertSee('id="room_picker_toggle"', false)
+            ->assertSee('id="anti-bentrok-alert"', false)
+            ->assertSee('data-status-for="'.$roomA->id.'"', false)
+            ->assertSee('data-status-for="'.$roomB->id.'"', false)
+            ->assertSee('data-room-name="'.$roomA->room_name.'"', false)
+            ->assertSee('data-room-name="'.$roomB->room_name.'"', false)
+            ->assertSee('Ujian Sertifikasi')
+            ->assertSee('Ruangan Saat Ini');
+    }
+
+    public function test_admin_cannot_move_event_to_another_room_with_approved_booking_conflict(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $applicant = $this->userWithRole('Guru');
+        $sourceRoom = $this->room('Ruang Asal');
+        $targetRoom = $this->room('Ruang Target');
+        $eventDate = now()->addDays(3)->toDateString();
+
+        $event = Event::create([
+            'user_id' => $applicant->id,
+            'room_id' => $sourceRoom->id,
+            'title' => 'Agenda Asal',
+            'event_date' => $eventDate,
+            'start_time' => '08:00',
+            'end_time' => '09:30',
+            'status' => 'Disetujui',
+        ]);
+
+        Event::create([
+            'user_id' => $applicant->id,
+            'room_id' => $targetRoom->id,
+            'title' => 'Agenda Lain yang Bentrok',
+            'event_date' => $eventDate,
+            'start_time' => '08:30',
+            'end_time' => '10:00',
+            'status' => 'Disetujui',
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->from(route('events.edit', $event))
+            ->put(route('events.update', $event), [
+                'room_id' => $targetRoom->id,
+                'start_time' => '08:00',
+                'end_time' => '09:30',
+                'move_reason' => 'Pindah ke ruang target',
+            ]);
+
+        $response->assertRedirect(route('events.edit', $event))
+            ->assertSessionHasErrors(['room_id']);
+
+        $errorMsg = session('errors')->first('room_id');
+        $this->assertStringContainsString('Ruangan sudah digunakan', $errorMsg);
+        $this->assertStringContainsString('Agenda Lain yang Bentrok', $errorMsg);
+
+        $this->assertDatabaseHas('events', [
+            'id' => $event->id,
+            'room_id' => $sourceRoom->id,
+        ]);
+    }
+
     private function room(string $name = 'Ruang Agenda'): Room
     {
         $pic = $this->userWithRole('PIC');

@@ -3,11 +3,15 @@
 @php($selectedRoom = $rooms->firstWhere('id', old('room_id')))
 <style>
     .room-picker { position:relative; }
-    .room-picker-list { position:absolute; z-index:5; top:100%; left:0; right:0; max-height:220px; overflow-y:auto; margin:4px 0 0; padding:4px; list-style:none; background:#fffdf8; border:1px solid #d7deea; border-radius:8px; box-shadow:0 8px 20px rgba(38, 54, 74, .12); }
+    .room-picker-input-wrap { position:relative; display:flex; align-items:center; }
+    .room-picker-input-wrap input { width:100%; padding-right:40px; }
+    .room-picker-toggle-btn { position:absolute; right:8px; background:transparent; border:none; color:#6d7788; cursor:pointer; padding:8px 10px; font-size:13px; line-height:1; }
+    .room-picker-toggle-btn:hover { color:#26364a; }
+    .room-picker-list { position:absolute; z-index:25; top:100%; left:0; right:0; max-height:240px; overflow-y:auto; margin:4px 0 0; padding:6px; list-style:none; background:#fffdf8; border:1px solid #d7deea; border-radius:8px; box-shadow:0 10px 25px rgba(38, 54, 74, .16); }
     .room-picker-list[hidden] { display:none; }
-    .room-picker-option { width:100%; padding:9px 10px; border:0; border-radius:5px; background:#fffdf8; color:#26364a; text-align:left; font:inherit; cursor:pointer; }
+    .room-picker-option { width:100%; padding:10px 12px; border:0; border-radius:6px; background:#fffdf8; color:#26364a; text-align:left; font:inherit; cursor:pointer; transition:background .15s ease; }
     .room-picker-option:hover, .room-picker-option:focus { background:#f1f3f6; outline:none; }
-    .room-picker-empty { padding:9px 10px; color:#6d7788; }
+    .room-picker-empty { padding:14px 10px; color:#6d7788; text-align:center; }
 </style>
 <div class="heading">
     <div>
@@ -31,7 +35,10 @@
         <div>
             <label for="room_search">{{ $canUseFreeTime ? 'Pilih ruangan' : 'Ruangan' }}</label>
             <div class="room-picker">
-                <input id="room_search" type="search" value="{{ $selectedRoom?->room_name }}" placeholder="Pilih atau cari ruangan..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="room-options" required>
+                <div class="room-picker-input-wrap">
+                    <input id="room_search" type="search" value="{{ $selectedRoom?->room_name }}" placeholder="Pilih atau cari ruangan..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="room-options" required>
+                    <button type="button" id="room_picker_toggle" class="room-picker-toggle-btn" aria-label="Buka pilihan ruangan">▼</button>
+                </div>
                 <input id="room_id" type="hidden" name="room_id" value="{{ old('room_id') }}">
                 <ul id="room-options" class="room-picker-list" role="listbox" hidden>
                 @foreach($rooms as $room)
@@ -99,12 +106,14 @@
         var list = document.getElementById('room-options');
         var options = Array.from(list.querySelectorAll('[data-room-id]'));
         var empty = list.querySelector('[data-room-empty]');
-        var picker = search.parentElement;
+        var picker = search.closest('.room-picker');
+        var toggleBtn = document.getElementById('room_picker_toggle');
+        var selectedRoomName = search.value.trim();
 
-        function openList() {
+        function openList(forceShowAll) {
             list.hidden = false;
             search.setAttribute('aria-expanded', 'true');
-            filterRooms();
+            filterRooms(forceShowAll);
         }
 
         function closeList() {
@@ -112,11 +121,14 @@
             search.setAttribute('aria-expanded', 'false');
         }
 
-        function filterRooms() {
+        function filterRooms(forceShowAll) {
             var query = search.value.trim().toLocaleLowerCase();
+            var currentSelected = (selectedRoomName || '').trim().toLocaleLowerCase();
+            var showAll = forceShowAll || (query === currentSelected) || !query;
+
             var visibleCount = 0;
             options.forEach(function (option) {
-                var matches = option.dataset.roomName.toLocaleLowerCase().includes(query);
+                var matches = showAll || option.dataset.roomName.toLocaleLowerCase().includes(query);
                 option.parentElement.hidden = !matches;
                 if (matches) visibleCount++;
             });
@@ -125,19 +137,45 @@
 
         function chooseRoom(option) {
             roomId.value = option.dataset.roomId;
+            selectedRoomName = option.dataset.roomName;
             search.value = option.dataset.roomName;
             search.setCustomValidity('');
             closeList();
         }
 
-        search.addEventListener('focus', openList);
+        search.addEventListener('focus', function () {
+            openList(true);
+            search.select();
+        });
+        search.addEventListener('click', function () {
+            if (list.hidden) openList(true);
+        });
         search.addEventListener('input', function () {
             roomId.value = '';
             search.setCustomValidity('');
-            openList();
+            openList(false);
         });
+        search.addEventListener('search', function () {
+            roomId.value = '';
+            selectedRoomName = '';
+            openList(true);
+        });
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (list.hidden) {
+                    openList(true);
+                    search.focus();
+                } else {
+                    closeList();
+                }
+            });
+        }
+
         options.forEach(function (option) {
-            option.addEventListener('click', function () {
+            option.addEventListener('click', function (e) {
+                e.preventDefault();
                 chooseRoom(option);
             });
         });
@@ -146,7 +184,7 @@
                 closeList();
             } else if (event.key === 'ArrowDown' && list.hidden) {
                 event.preventDefault();
-                openList();
+                openList(true);
                 var first = list.querySelector('[data-room-id]:not([hidden])');
                 if (first) first.focus();
             } else if (event.key === 'Enter' && !list.hidden) {

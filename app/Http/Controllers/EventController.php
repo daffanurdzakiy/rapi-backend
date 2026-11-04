@@ -82,10 +82,18 @@ class EventController extends Controller
         abort_unless($request->user()->role?->role_name === 'Admin', 403);
         abort_unless(in_array($event->status, ['Pending', 'Disetujui']), 422);
 
+        $dateString = Carbon::parse($event->event_date)->toDateString();
+        $approvedEventsOnDate = Event::with('room')
+            ->whereDate('event_date', $dateString)
+            ->where('status', 'Disetujui')
+            ->whereKeyNot($event->id)
+            ->get(['id', 'room_id', 'title', 'start_time', 'end_time']);
+
         return view('events.edit', [
             'event' => $event->load(['room', 'user']),
             'rooms' => Room::orderBy('room_name')->get(),
             'sessions' => $this->regularSessions(),
+            'approvedEventsOnDate' => $approvedEventsOnDate,
         ]);
     }
 
@@ -305,9 +313,19 @@ class EventController extends Controller
     // Hanya agenda 'Disetujui' yang beririsan yang menghalangi penggunaan ruangan.
     private function ensureAvailable(int $roomId, string $date, string $start, string $end, ?int $ignoreId = null): void
     {
-        $conflict = Event::where('room_id', $roomId)->whereDate('event_date', $date)->where('status', 'Disetujui')->where('start_time', '<', $end)->where('end_time', '>', $start)->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))->exists();
+        $conflict = Event::where('room_id', $roomId)
+            ->whereDate('event_date', $date)
+            ->where('status', 'Disetujui')
+            ->where('start_time', '<', $end)
+            ->where('end_time', '>', $start)
+            ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
+            ->first();
+
         if ($conflict) {
-            throw ValidationException::withMessages(['room_id' => 'Ruangan sudah digunakan pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.']);
+            $conflictTime = substr($conflict->start_time, 0, 5).'–'.substr($conflict->end_time, 0, 5);
+            throw ValidationException::withMessages([
+                'room_id' => "Ruangan sudah digunakan pada rentang waktu tersebut oleh agenda \"{$conflict->title}\" ({$conflictTime}). Silakan pilih ruang atau waktu lain.",
+            ]);
         }
     }
 }
