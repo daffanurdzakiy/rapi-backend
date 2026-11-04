@@ -12,71 +12,6 @@
     .room-picker-option { width:100%; padding:10px 12px; border:0; border-radius:6px; background:#fffdf8; color:#26364a; text-align:left; font:inherit; cursor:pointer; transition:background .15s ease; }
     .room-picker-option:hover, .room-picker-option:focus { background:#f1f3f6; outline:none; }
     .room-picker-empty { padding:14px 10px; color:#6d7788; text-align:center; }
-
-    .booking-type-selector {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 12px;
-        margin-top: 6px;
-    }
-    .booking-type-card {
-        position: relative;
-        display: block;
-        padding: 14px 16px;
-        border: 2px solid #dce5ef;
-        border-radius: 10px;
-        background: #fffdf8;
-        cursor: pointer;
-        transition: all .2s ease;
-    }
-    .booking-type-card:hover {
-        border-color: #667b99;
-        background: #f8fafc;
-    }
-    .booking-type-card input[type="radio"] {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-    }
-    .booking-type-card.is-active {
-        border-color: #35465e;
-        background: #f1f5f9;
-        box-shadow: 0 4px 14px rgba(38, 54, 74, .08);
-    }
-    .booking-type-content {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .booking-type-icon {
-        font-size: 26px;
-        line-height: 1;
-        flex-shrink: 0;
-    }
-    .booking-type-title {
-        display: block;
-        color: #26364a;
-        font-size: 14px;
-        font-weight: 700;
-    }
-    .booking-type-desc {
-        display: block;
-        color: #6d7788;
-        font-size: 12px;
-        margin-top: 2px;
-    }
-
-    .date-summary-box {
-        display: none;
-        margin-top: 10px;
-        padding: 12px 14px;
-        border-radius: 8px;
-        background: #f0fdf4;
-        border: 1px solid #bbf7d0;
-        color: #166534;
-        font-size: 13px;
-        line-height: 1.5;
-    }
 </style>
 <div class="heading">
     <div>
@@ -95,35 +30,8 @@
     <div class="form-grid">
         <div class="full">
             <label for="title">Nama kegiatan</label>
-            <input id="title" name="title" value="{{ old('title') }}" placeholder="Contoh: Uji Kompetensi Keahlian (UKK) / Workshop IT" required>
+            <input id="title" name="title" value="{{ old('title') }}" required>
         </div>
-
-        <div class="full">
-            <label style="font-weight:700">Tipe Durasi Peminjaman</label>
-            <div class="booking-type-selector">
-                <label class="booking-type-card {{ old('booking_type', 'single') === 'single' ? 'is-active' : '' }}" id="card_type_single">
-                    <input type="radio" name="booking_type" value="single" @checked(old('booking_type', 'single') === 'single')>
-                    <span class="booking-type-content">
-                        <span class="booking-type-icon">📅</span>
-                        <span>
-                            <strong class="booking-type-title">Satu Hari</strong>
-                            <small class="booking-type-desc">Kegiatan berlangsung selesai dalam 1 hari</small>
-                        </span>
-                    </span>
-                </label>
-                <label class="booking-type-card {{ old('booking_type') === 'range' ? 'is-active' : '' }}" id="card_type_range">
-                    <input type="radio" name="booking_type" value="range" @checked(old('booking_type') === 'range')>
-                    <span class="booking-type-content">
-                        <span class="booking-type-icon">📆</span>
-                        <span>
-                            <strong class="booking-type-title">Lebih dari 1 Hari (Rentang Tanggal)</strong>
-                            <small class="booking-type-desc">Kegiatan berturut-turut (misal: Ujian/UKK, Workshop, Lomba)</small>
-                        </span>
-                    </span>
-                </label>
-            </div>
-        </div>
-
         <div>
             <label for="room_search">{{ $canUseFreeTime ? 'Pilih ruangan' : 'Ruangan' }}</label>
             <div class="room-picker">
@@ -150,25 +58,32 @@
             </div>
             @error('room_id')<p class="error">{{ $message }}</p>@enderror
         </div>
-
-        <div id="single_date_container">
-            <label for="event_date" id="event_date_label">Tanggal Kegiatan</label>
+        <div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <label for="event_date" id="event_date_label" style="margin:15px 0 7px;">Tanggal</label>
+                <button type="button" id="btn_toggle_multi_day" class="btn ghost" style="min-height:26px; padding:2px 10px; font-size:11.5px; border-radius:6px; margin-bottom:7px; cursor:pointer;" title="Klik untuk meminjam ruangan lebih dari 1 hari">
+                    + Peminjaman lebih dari 1 hari
+                </button>
+            </div>
+            <input type="hidden" name="booking_type" id="booking_type" value="{{ old('booking_type', old('end_date') ? 'range' : 'single') }}">
             <input id="event_date" type="date" name="event_date" value="{{ old('event_date') }}" min="{{ $firstBookingDate }}" required>
-            <p class="muted">Peminjaman ruang hanya dapat diajukan mulai H-1 (besok) dan seterusnya.</p>
+            <p id="single_date_hint" class="muted">Peminjaman ruang hanya dapat diajukan mulai H-1 (besok) dan seterusnya.</p>
             @error('event_date')<p class="error">{{ $message }}</p>@enderror
-        </div>
 
-        <div id="end_date_container" style="display:none">
-            <label for="end_date">Tanggal Selesai</label>
-            <input id="end_date" type="date" name="end_date" value="{{ old('end_date') }}" min="{{ $firstBookingDate }}">
-            <p class="muted">Pilih tanggal terakhir pelaksanaan kegiatan.</p>
-            @error('end_date')<p class="error">{{ $message }}</p>@enderror
-        </div>
+            {{-- Kolom Tanggal Selesai (Hanya muncul jika tombol peminjaman lebih dari 1 hari ditekan) --}}
+            <div id="end_date_wrapper" style="display:none; margin-top:12px;">
+                <label for="end_date" style="margin:0 0 7px;">Tanggal Selesai</label>
+                <input id="end_date" type="date" name="end_date" value="{{ old('end_date') }}" min="{{ $firstBookingDate }}" disabled>
+                @error('end_date')<p class="error">{{ $message }}</p>@enderror
+            </div>
 
-        <div class="full" id="date_summary_wrapper" style="display:none">
-            <div id="date_range_summary" class="date-summary-box"></div>
+            {{-- Kotak Keterangan Tambahan Saat Mode Peminjaman Lebih Dari 1 Hari Aktif --}}
+            <div id="multi_day_info" style="display:none; margin-top:12px; padding:10px 12px; border-radius:8px; background:#f1f5f9; border:1px solid #dce5ef; font-size:12px; line-height:1.45;">
+                <div style="font-weight:600; color:#35465e; margin-bottom:2px;">ℹ️ Keterangan Peminjaman Lebih dari 1 Hari</div>
+                <div style="color:#6d7788;">Peminjaman berturut-turut pada jam sesi yang sama setiap harinya (maksimal 30 hari).</div>
+                <div id="multi_day_summary_text" style="margin-top:6px; font-weight:700; color:#166534; display:none;"></div>
+            </div>
         </div>
-
         <div>
             <label for="start_time">Jam mulai</label>
             <select id="start_time" name="start_time" required>
@@ -208,9 +123,9 @@
             @error('end_time')<p class="error">{{ $message }}</p>@enderror
         </div>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:22px">
-        <button class="btn" type="submit">Kirim Pengajuan</button>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
         <a class="btn ghost" href="{{ route('events.index') }}">Batal</a>
+        <button class="btn" type="submit">Ajukan</button>
     </div>
 </form>
 
@@ -327,48 +242,41 @@
         document.addEventListener('click', function (event) {
             if (!picker.contains(event.target)) closeList();
         });
+        document.getElementById('event-form').addEventListener('submit', function (event) {
+            if (!roomId.value) {
+                event.preventDefault();
+                search.setCustomValidity('Pilih ruangan dari daftar yang tersedia.');
+                search.reportValidity();
+            }
+        });
 
         // ==========================================
-        // DURATION TYPE & MULTI-DAY HANDLING
+        // TOGGLE PEMINJAMAN LEBIH DARI 1 HARI
         // ==========================================
-        var typeRadios = document.querySelectorAll('input[name="booking_type"]');
-        var cardSingle = document.getElementById('card_type_single');
-        var cardRange = document.getElementById('card_type_range');
+        var btnToggle = document.getElementById('btn_toggle_multi_day');
+        var bookingTypeInput = document.getElementById('booking_type');
         var eventDateLabel = document.getElementById('event_date_label');
         var eventDateInput = document.getElementById('event_date');
-        var endDateContainer = document.getElementById('end_date_container');
+        var endDateWrapper = document.getElementById('end_date_wrapper');
         var endDateInput = document.getElementById('end_date');
-        var summaryWrapper = document.getElementById('date_summary_wrapper');
-        var summaryBox = document.getElementById('date_range_summary');
+        var multiDayInfo = document.getElementById('multi_day_info');
+        var singleDateHint = document.getElementById('single_date_hint');
+        var summaryText = document.getElementById('multi_day_summary_text');
 
-        var startSelect = document.getElementById('start_time');
-        var endSelect = document.getElementById('end_time');
+        var isMultiDay = bookingTypeInput.value === 'range';
 
-        function isRangeMode() {
-            var selected = document.querySelector('input[name="booking_type"]:checked');
-            return selected && selected.value === 'range';
-        }
-
-        function formatIdDate(dateStr) {
-            if (!dateStr) return '';
-            var parts = dateStr.split('-');
-            if (parts.length !== 3) return dateStr;
-            var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-            var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-            var days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-            return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
-        }
-
-        function updateDurationView() {
-            var range = isRangeMode();
-            cardSingle.classList.toggle('is-active', !range);
-            cardRange.classList.toggle('is-active', range);
-
-            if (range) {
+        function updateMultiDayUI() {
+            if (isMultiDay) {
+                btnToggle.textContent = '✕ Batal (1 Hari)';
+                btnToggle.style.color = '#35465e';
+                btnToggle.style.background = '#e8edf4';
                 eventDateLabel.textContent = 'Tanggal Mulai';
-                endDateContainer.style.display = 'block';
-                endDateInput.required = true;
+                endDateWrapper.style.display = 'block';
                 endDateInput.disabled = false;
+                endDateInput.required = true;
+                multiDayInfo.style.display = 'block';
+                singleDateHint.style.display = 'none';
+                bookingTypeInput.value = 'range';
 
                 if (eventDateInput.value) {
                     endDateInput.min = eventDateInput.value;
@@ -377,126 +285,95 @@
                     }
                 }
             } else {
-                eventDateLabel.textContent = 'Tanggal Kegiatan';
-                endDateContainer.style.display = 'none';
-                endDateInput.required = false;
+                btnToggle.textContent = '+ Peminjaman lebih dari 1 hari';
+                btnToggle.style.color = '';
+                btnToggle.style.background = '';
+                eventDateLabel.textContent = 'Tanggal';
+                endDateWrapper.style.display = 'none';
                 endDateInput.disabled = true;
+                endDateInput.required = false;
+                endDateInput.value = '';
+                multiDayInfo.style.display = 'none';
+                singleDateHint.style.display = 'block';
+                bookingTypeInput.value = 'single';
             }
-
-            calculateDateRangeSummary();
+            updateSummary();
         }
 
-        function calculateDateRangeSummary() {
-            if (!isRangeMode()) {
-                summaryWrapper.style.display = 'none';
-                summaryBox.style.display = 'none';
+        function updateSummary() {
+            if (!isMultiDay) {
+                summaryText.style.display = 'none';
                 return;
             }
 
-            var startStr = eventDateInput.value;
-            var endStr = endDateInput.value;
-
-            if (!startStr || !endStr) {
-                summaryWrapper.style.display = 'none';
-                summaryBox.style.display = 'none';
+            var sVal = eventDateInput.value;
+            var eVal = endDateInput.value;
+            if (!sVal || !eVal) {
+                summaryText.style.display = 'none';
                 return;
             }
 
-            var startParts = startStr.split('-');
-            var endParts = endStr.split('-');
-            var startDate = new Date(parseInt(startParts[0], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[2], 10));
-            var endDate = new Date(parseInt(endParts[0], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[2], 10));
-
-            var diffTime = endDate.getTime() - startDate.getTime();
-            var totalDays = Math.round(diffTime / (1000 * 3600 * 24)) + 1;
-
-            if (totalDays <= 0) {
-                endDateInput.value = startStr;
-                totalDays = 1;
+            var s = new Date(sVal + 'T00:00:00');
+            var e = new Date(eVal + 'T00:00:00');
+            if (e < s) {
+                summaryText.style.display = 'block';
+                summaryText.style.color = '#b91c1c';
+                summaryText.textContent = '⚠️ Tanggal selesai harus sama atau setelah tanggal mulai.';
+                return;
             }
 
-            var startTimeText = startSelect.value === 'free' ? 'Waktu Bebas' : startSelect.value;
-            var endTimeText = endSelect.value === 'free' ? 'Waktu Bebas' : endSelect.value;
-            var timeRangeText = (startTimeText && endTimeText) ? (startTimeText + ' – ' + endTimeText) : 'jam sesi yang dipilih';
-
-            summaryWrapper.style.display = 'block';
-            summaryBox.style.display = 'block';
-
-            if (totalDays === 1) {
-                summaryBox.innerHTML = '<strong>✨ Durasi: 1 Hari</strong> (' + formatIdDate(startStr) + ').<br>' +
-                    '<span style="font-size:12px;opacity:0.9">Agenda akan dipinjam pada pukul ' + timeRangeText + '.</span>';
-            } else {
-                summaryBox.innerHTML = '<strong>✨ Peminjaman Multi-Hari: ' + totalDays + ' Hari Berturut-turut</strong><br>' +
-                    'Rentang: <b>' + formatIdDate(startStr) + '</b> s/d <b>' + formatIdDate(endStr) + '</b>.<br>' +
-                    '<span style="font-size:12px;opacity:0.9">Sistem otomatis memesan ruangan untuk ' + totalDays + ' hari pada pukul ' + timeRangeText + ' setiap harinya.</span>';
-            }
+            var days = Math.round((e.getTime() - s.getTime()) / (1000 * 3600 * 24)) + 1;
+            summaryText.style.display = 'block';
+            summaryText.style.color = '#166534';
+            summaryText.textContent = '✨ Total Durasi: ' + days + ' Hari berturut-turut (' + sVal + ' s/d ' + eVal + ')';
         }
 
-        typeRadios.forEach(function (radio) {
-            radio.addEventListener('change', updateDurationView);
+        btnToggle.addEventListener('click', function () {
+            isMultiDay = !isMultiDay;
+            updateMultiDayUI();
         });
 
         eventDateInput.addEventListener('change', function () {
-            if (isRangeMode() && this.value) {
+            if (isMultiDay && this.value) {
                 endDateInput.min = this.value;
                 if (!endDateInput.value || endDateInput.value < this.value) {
                     endDateInput.value = this.value;
                 }
             }
-            calculateDateRangeSummary();
+            updateSummary();
         });
 
-        endDateInput.addEventListener('change', calculateDateRangeSummary);
-        startSelect.addEventListener('change', calculateDateRangeSummary);
-        endSelect.addEventListener('change', calculateDateRangeSummary);
+        endDateInput.addEventListener('change', updateSummary);
 
-        // Submit validation
-        document.getElementById('event-form').addEventListener('submit', function (event) {
-            if (!roomId.value) {
-                event.preventDefault();
-                search.setCustomValidity('Pilih ruangan dari daftar yang tersedia.');
-                search.reportValidity();
-                return;
-            }
-
-            var room = document.getElementById('room_search').value;
-            var title = document.getElementById('title').value.trim();
-            var date = document.getElementById('event_date').value;
-            var isRange = isRangeMode();
-            var endDate = endDateInput.value;
-
-            var start = document.getElementById('start_time').value === 'free'
-                ? (document.getElementById('start_time_free') ? document.getElementById('start_time_free').value : 'Waktu Bebas')
-                : document.getElementById('start_time').value;
-            var end = document.getElementById('end_time').value === 'free'
-                ? (document.getElementById('end_time_free') ? document.getElementById('end_time_free').value : 'Waktu Bebas')
-                : document.getElementById('end_time').value;
-
-            var dateText = date;
-            if (isRange && endDate && endDate !== date) {
-                var sParts = date.split('-');
-                var eParts = endDate.split('-');
-                var sDate = new Date(parseInt(sParts[0], 10), parseInt(sParts[1], 10) - 1, parseInt(sParts[2], 10));
-                var eDate = new Date(parseInt(eParts[0], 10), parseInt(eParts[1], 10) - 1, parseInt(eParts[2], 10));
-                var days = Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 3600 * 24)) + 1;
-                dateText = date + ' s/d ' + endDate + ' (' + days + ' hari berturut-turut)';
-            }
-
-            var message = 'Kirim pengajuan agenda ini?\n\n'
-                + 'Kegiatan: ' + title + '\n'
-                + 'Ruangan: ' + room + '\n'
-                + 'Tanggal: ' + dateText + '\n'
-                + 'Waktu: ' + start + ' - ' + end;
-
-            if (!window.confirm(message)) {
-                event.preventDefault();
-            }
-        });
-
-        // Initialize state
-        updateDurationView();
+        // Inisialisasi tampilan awal
+        updateMultiDayUI();
     })();
 </script>
+@if($canUseFreeTime)
+<script>
+    document.getElementById('event-form').addEventListener('submit', function (event) {
+        var room = document.getElementById('room_search').value;
+        var title = document.getElementById('title').value.trim();
+        var date = document.getElementById('event_date').value;
+        var isRange = document.getElementById('booking_type').value === 'range';
+        var endDate = document.getElementById('end_date') ? document.getElementById('end_date').value : '';
+        if (isRange && endDate && endDate > date) {
+            date = date + ' s/d ' + endDate;
+        }
+        var start = document.getElementById('start_time').value === 'free'
+            ? document.getElementById('start_time_free').value
+            : document.getElementById('start_time').value;
+        var end = document.getElementById('end_time').value === 'free'
+            ? document.getElementById('end_time_free').value
+            : document.getElementById('end_time').value;
+        var message = 'Kirim pengajuan agenda ini?\n\nKegiatan: ' + title
+            + '\nRuangan: ' + room
+            + '\nTanggal: ' + date
+            + '\nWaktu: ' + start + ' - ' + end;
+        if (!window.confirm(message)) event.preventDefault();
+    });
+</script>
+@endif
 @if($canUseFreeTime)
 <script>
     ['start_time', 'end_time'].forEach(function (field) {
