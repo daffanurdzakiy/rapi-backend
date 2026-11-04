@@ -10,6 +10,7 @@ use App\Models\SessionTime;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 // =========================================================================
@@ -103,6 +104,8 @@ class EventController extends ApiController
             'room_id' => ['required', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
             'event_date' => ['required', 'date', 'after:today'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
+            'booking_type' => ['nullable', 'in:single,range'],
             'start_time' => [
                 'required',
                 'date_format:H:i',
@@ -128,6 +131,7 @@ class EventController extends ApiController
             ],
         ], [
             'event_date.after' => 'Tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
+            'end_date.after_or_equal' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
             'end_time.after' => 'Jam selesai harus setelah jam mulai.',
             'room_id.exists' => 'Ruangan yang dipilih tidak valid.',
         ]);
@@ -138,40 +142,87 @@ class EventController extends ApiController
 
         $data = $validator->validated();
 
-        // Hanya agenda berstatus Disetujui yang menghalangi penggunaan ruangan.
-        if ($this->hasConflict((int) $data['room_id'], $data['event_date'], $data['start_time'], $data['end_time'])) {
-            return $this->sendError('Ruangan sudah digunakan pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.', [
-                'room_id' => ['Ruangan sudah dipesan pada waktu ini.'],
+        $startDate = Carbon::parse($data['event_date']);
+        $isRange = ($request->input('booking_type') === 'range' || ! empty($data['end_date']))
+            && ! empty($data['end_date'])
+            && $data['end_date'] > $data['event_date'];
+
+        $endDate = $isRange ? Carbon::parse($data['end_date']) : $startDate->copy();
+
+        $dates = [];
+        $current = $startDate->copy();
+        while ($current->lte($endDate)) {
+            $dates[] = $current->copy();
+            $current->addDay();
+        }
+
+        if (count($dates) > 30) {
+            return $this->sendError('Peminjaman ruangan maksimal 30 hari berturut-turut.', [
+                'end_date' => ['Peminjaman ruangan maksimal 30 hari berturut-turut.'],
             ], 422);
         }
 
+        // Mengecek apakah ruangan sudah dipakai pada setiap hari dalam rentang tanggal
+        foreach ($dates as $date) {
+            if ($this->hasConflict((int) $data['room_id'], $date->toDateString(), $data['start_time'], $data['end_time'])) {
+                $dateFormatted = $date->translatedFormat('d M Y');
+                return $this->sendError("Ruangan sudah digunakan pada tanggal {$dateFormatted} pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.", [
+                    'room_id' => ["Ruangan sudah dipesan pada tanggal {$dateFormatted}."],
+                ], 422);
+            }
+        }
+
         // Jika yang membuat adalah Admin, status otomatis 'Disetujui'. Jika Guru/Organisasi, status awal adalah 'Pending'.
+        $totalDays = count($dates);
         $status = $roleName === 'Admin' ? 'Disetujui' : 'Pending';
-        $event = Event::create($data + [
-            'user_id' => $user->id,
-            'status' => $status,
-            'approved_by' => $roleName === 'Admin' ? $user->id : null,
-        ]);
+        $approvedBy = $roleName === 'Admin' ? $user->id : null;
+        $createdEvents = [];
+
+        DB::transaction(function () use ($dates, $totalDays, $data, $user, $status, $approvedBy, &$createdEvents) {
+            foreach ($dates as $index => $date) {
+                $dayNum = $index + 1;
+                $title = $totalDays > 1
+                    ? "{$data['title']} (Hari {$dayNum}/{$totalDays})"
+                    : $data['title'];
+
+                $createdEvents[] = Event::create([
+                    'user_id' => $user->id,
+                    'room_id' => $data['room_id'],
+                    'title' => $title,
+                    'event_date' => $date->toDateString(),
+                    'start_time' => $data['start_time'],
+                    'end_time' => $data['end_time'],
+                    'status' => $status,
+                    'approved_by' => $approvedBy,
+                ]);
+            }
+        });
 
         // If submitted by Guru/Organisasi, optionally notify the room's PIC
         // Kirim notifikasi ke PIC ruangan bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
         if ($status === 'Pending') {
             $room = Room::find($data['room_id']);
             if ($room && $room->pic_id) {
+                $firstEvent = $createdEvents[0] ?? null;
+                $dateSummary = $totalDays > 1
+                    ? "{$startDate->translatedFormat('d M')} s/d {$endDate->translatedFormat('d M Y')} ({$totalDays} hari)"
+                    : $startDate->translatedFormat('d M Y');
+
                 Notification::create([
-                    'event_id' => $event->id,
+                    'event_id' => $firstEvent?->id,
                     'user_id' => $room->pic_id,
-                    'message' => "Pengajuan peminjaman ruangan {$room->room_name} baru dari {$user->name}: {$event->title}.",
+                    'message' => "Pengajuan peminjaman ruangan {$room->room_name} baru dari {$user->name} untuk {$dateSummary}: {$data['title']}.",
                 ]);
             }
         }
 
+        $firstEvent = $createdEvents[0];
         $message = $roleName === 'Admin'
-            ? 'Agenda berhasil dibuat dan langsung disetujui.'
-            : 'Agenda berhasil diajukan dan menunggu persetujuan PIC.';
+            ? ($totalDays > 1 ? "Agenda {$totalDays} hari berhasil dibuat dan langsung disetujui." : 'Agenda berhasil dibuat dan langsung disetujui.')
+            : ($totalDays > 1 ? "Agenda {$totalDays} hari berhasil diajukan dan menunggu persetujuan PIC." : 'Agenda berhasil diajukan dan menunggu persetujuan PIC.');
 
         return $this->sendResponse(
-            new EventResource($event->load(['room.pic', 'user'])),
+            new EventResource($firstEvent->load(['room.pic', 'user'])),
             $message,
             201,
         );
@@ -289,6 +340,7 @@ class EventController extends ApiController
         $validator = Validator::make($request->all(), [
             'room_id' => ['required', 'exists:rooms,id'],
             'event_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
             'ignore_event_id' => ['nullable', 'integer'],
@@ -299,21 +351,64 @@ class EventController extends ApiController
         }
 
         $data = $validator->validated();
-        $conflict = $this->hasConflict(
-            (int) $data['room_id'],
-            $data['event_date'],
-            $data['start_time'],
-            $data['end_time'],
-            isset($data['ignore_event_id']) ? (int) $data['ignore_event_id'] : null,
-        );
+
+        $startDate = Carbon::parse($data['event_date']);
+        $endDate = ! empty($data['end_date']) && $data['end_date'] > $data['event_date']
+            ? Carbon::parse($data['end_date'])
+            : $startDate->copy();
+
+        $dates = [];
+        $cur = $startDate->copy();
+        while ($cur->lte($endDate)) {
+            $dates[] = $cur->copy();
+            $cur->addDay();
+        }
+
+        $conflictDate = null;
+        foreach ($dates as $d) {
+            if ($this->hasConflict(
+                (int) $data['room_id'],
+                $d->toDateString(),
+                $data['start_time'],
+                $data['end_time'],
+                isset($data['ignore_event_id']) ? (int) $data['ignore_event_id'] : null,
+            )) {
+                $conflictDate = $d;
+                break;
+            }
+        }
+
+        $totalDays = count($dates);
+        if ($conflictDate !== null) {
+            $msg = $totalDays > 1
+                ? "Ruangan tidak tersedia pada tanggal {$conflictDate->translatedFormat('d M Y')}."
+                : 'Ruangan tidak tersedia pada waktu tersebut.';
+
+            return $this->sendResponse([
+                'available' => false,
+                'room_id' => (int) $data['room_id'],
+                'event_date' => $data['event_date'],
+                'end_date' => $data['end_date'] ?? null,
+                'conflict_date' => $conflictDate->toDateString(),
+                'start_time' => $data['start_time'],
+                'end_time' => $data['end_time'],
+                'message' => $msg,
+            ]);
+        }
+
+        $successMsg = $totalDays > 1
+            ? "Ruangan tersedia untuk {$totalDays} hari berturut-turut ({$startDate->translatedFormat('d M')} s/d {$endDate->translatedFormat('d M Y')})."
+            : 'Ruangan tersedia.';
 
         return $this->sendResponse([
-            'available' => ! $conflict,
+            'available' => true,
             'room_id' => (int) $data['room_id'],
             'event_date' => $data['event_date'],
+            'end_date' => $data['end_date'] ?? null,
+            'total_days' => $totalDays,
             'start_time' => $data['start_time'],
             'end_time' => $data['end_time'],
-            'message' => $conflict ? 'Ruangan tidak tersedia pada waktu tersebut.' : 'Ruangan tersedia.',
+            'message' => $successMsg,
         ]);
     }
 

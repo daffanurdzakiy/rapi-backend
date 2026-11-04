@@ -675,6 +675,200 @@ class EventSessionTimeTest extends TestCase
         ]);
     }
 
+    public function test_multi_day_booking_creates_daily_events_for_guru(): void
+    {
+        $guru = $this->userWithRole('Guru');
+        $room = $this->room('Lab Komputer 1');
+        $startDate = now()->addDays(2)->toDateString();
+        $endDate = now()->addDays(4)->toDateString(); // 3 hari berturut-turut
+
+        $response = $this->actingAs($guru)
+            ->post(route('events.store'), [
+                'room_id' => $room->id,
+                'title' => 'Ujian Sertifikasi Keahlian',
+                'booking_type' => 'range',
+                'event_date' => $startDate,
+                'end_date' => $endDate,
+                'start_time' => '08:00',
+                'end_time' => '11:45',
+            ]);
+
+        $response->assertRedirect(route('events.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseCount('events', 3);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'user_id' => $guru->id,
+            'title' => 'Ujian Sertifikasi Keahlian (Hari 1/3)',
+            'event_date' => $startDate . ' 00:00:00',
+            'start_time' => '08:00',
+            'end_time' => '11:45',
+            'status' => 'Pending',
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'user_id' => $guru->id,
+            'title' => 'Ujian Sertifikasi Keahlian (Hari 2/3)',
+            'event_date' => now()->addDays(3)->toDateString() . ' 00:00:00',
+            'status' => 'Pending',
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'user_id' => $guru->id,
+            'title' => 'Ujian Sertifikasi Keahlian (Hari 3/3)',
+            'event_date' => $endDate . ' 00:00:00',
+            'status' => 'Pending',
+        ]);
+
+        // Cek notifikasi terkirim ke PIC
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $room->pic_id,
+        ]);
+    }
+
+    public function test_multi_day_booking_auto_approved_for_admin(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $room = $this->room('Aula Utama');
+        $startDate = now()->addDays(5)->toDateString();
+        $endDate = now()->addDays(6)->toDateString(); // 2 hari
+
+        $response = $this->actingAs($admin)
+            ->post(route('events.store'), [
+                'room_id' => $room->id,
+                'title' => 'Pameran Karya Siswa',
+                'booking_type' => 'range',
+                'event_date' => $startDate,
+                'end_date' => $endDate,
+                'start_time' => '08:00',
+                'end_time' => '15:30',
+            ]);
+
+        $response->assertRedirect(route('events.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseCount('events', 2);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'user_id' => $admin->id,
+            'title' => 'Pameran Karya Siswa (Hari 1/2)',
+            'event_date' => $startDate . ' 00:00:00',
+            'status' => 'Disetujui',
+            'approved_by' => $admin->id,
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'user_id' => $admin->id,
+            'title' => 'Pameran Karya Siswa (Hari 2/2)',
+            'event_date' => $endDate . ' 00:00:00',
+            'status' => 'Disetujui',
+            'approved_by' => $admin->id,
+        ]);
+    }
+
+    public function test_multi_day_booking_rolls_back_if_any_day_conflicts(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $guru = $this->userWithRole('Guru');
+        $room = $this->room('Lab Komputer 2');
+
+        $startDate = now()->addDays(3)->toDateString();
+        $middleDate = now()->addDays(4)->toDateString();
+        $endDate = now()->addDays(5)->toDateString();
+
+        // Hari ke-2 sudah ada jadwal yang disetujui
+        Event::create([
+            'user_id' => $admin->id,
+            'room_id' => $room->id,
+            'title' => 'Workshop Internal Guru',
+            'event_date' => $middleDate,
+            'start_time' => '08:00',
+            'end_time' => '11:45',
+            'status' => 'Disetujui',
+            'approved_by' => $admin->id,
+        ]);
+
+        $this->assertDatabaseCount('events', 1);
+
+        // Guru mengajukan rentang 3 hari (hari ke-2 bentrok)
+        $response = $this->actingAs($guru)
+            ->from(route('events.create'))
+            ->post(route('events.store'), [
+                'room_id' => $room->id,
+                'title' => 'Pelatihan Siswa',
+                'booking_type' => 'range',
+                'event_date' => $startDate,
+                'end_date' => $endDate,
+                'start_time' => '08:45',
+                'end_time' => '11:00',
+            ]);
+
+        $response->assertRedirect(route('events.create'))
+            ->assertSessionHasErrors(['room_id']);
+
+        // Pastikan tidak ada event baru yang tersimpan (rollback DB transaction)
+        $this->assertDatabaseCount('events', 1);
+    }
+
+    public function test_api_multi_day_booking_and_availability(): void
+    {
+        $guru = $this->userWithRole('Guru');
+        $room = $this->room('Ruang Rapat Guru');
+        $startDate = now()->addDays(2)->toDateString();
+        $endDate = now()->addDays(3)->toDateString();
+
+        // 1. Cek availability multi-hari via API
+        $availResponse = $this->actingAs($guru, 'sanctum')
+            ->getJson('/api/events/check-availability?' . http_build_query([
+                'room_id' => $room->id,
+                'event_date' => $startDate,
+                'end_date' => $endDate,
+                'start_time' => '08:00',
+                'end_time' => '11:45',
+            ]));
+
+        $availResponse->assertOk()
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'available' => true,
+                    'total_days' => 2,
+                ],
+            ]);
+
+        // 2. Submit multi-hari via API
+        $storeResponse = $this->actingAs($guru, 'sanctum')
+            ->postJson('/api/events', [
+                'room_id' => $room->id,
+                'title' => 'Rapat Koordinasi Ujian',
+                'event_date' => $startDate,
+                'end_date' => $endDate,
+                'booking_type' => 'range',
+                'start_time' => '08:00',
+                'end_time' => '11:45',
+            ]);
+
+        $storeResponse->assertStatus(201)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $this->assertDatabaseCount('events', 2);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'title' => 'Rapat Koordinasi Ujian (Hari 1/2)',
+            'event_date' => $startDate . ' 00:00:00',
+            'status' => 'Pending',
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'title' => 'Rapat Koordinasi Ujian (Hari 2/2)',
+            'event_date' => $endDate . ' 00:00:00',
+            'status' => 'Pending',
+        ]);
+    }
+
     private function room(string $name = 'Ruang Agenda'): Room
     {
         $pic = $this->userWithRole('PIC');

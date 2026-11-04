@@ -9,6 +9,7 @@ use App\Models\SessionTime;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -51,27 +52,104 @@ class EventController extends Controller
         ]);
     }
 
-    /** Save a request after rejecting overlapping room and time ranges. */
-    // Menyimpan pengajuan agenda baru setelah memastikan tidak ada jadwal yang bentrok.
+    /** Save a request after rejecting overlapping room and time ranges (supports single and multi-day). */
+    // Menyimpan pengajuan agenda baru setelah memastikan tidak ada jadwal yang bentrok (mendukung 1 hari maupun multi-hari).
     public function store(Request $request): RedirectResponse
     {
         $roleName = $request->user()->role?->role_name;
         abort_unless(in_array($roleName, ['Admin', 'Guru', 'Organisasi']), 403);
 
         $data = $this->validateEvent($request);
-        // Mengecek apakah ruangan sudah dipakai pada tanggal dan jam tersebut (Anti-Bentrok).
-        $this->ensureAvailable($data['room_id'], $data['event_date'], $data['start_time'], $data['end_time']);
-        // Jika dibuat oleh Admin langsung 'Disetujui', jika Guru/Organisasi statusnya 'Pending'.
-        $status = $roleName === 'Admin' ? 'Disetujui' : 'Pending';
-        Event::create($data + [
-            'user_id' => $request->user()->id,
-            'status' => $status,
-            'approved_by' => $roleName === 'Admin' ? $request->user()->id : null,
-        ]);
 
-        $message = $roleName === 'Admin'
-            ? 'Agenda berhasil dibuat dan langsung disetujui.'
-            : 'Agenda berhasil diajukan dan menunggu persetujuan.';
+        // Menentukan rentang tanggal kegiatan (mendukung peminjaman 1 hari maupun multi-hari berturut-turut)
+        $startDate = Carbon::parse($data['event_date']);
+        $isRange = ($request->input('booking_type') === 'range' || ! empty($data['end_date']))
+            && ! empty($data['end_date'])
+            && $data['end_date'] > $data['event_date'];
+
+        $endDate = $isRange ? Carbon::parse($data['end_date']) : $startDate->copy();
+
+        if ($endDate->lt($startDate)) {
+            throw ValidationException::withMessages([
+                'end_date' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
+            ]);
+        }
+
+        // Himpun seluruh tanggal dalam rentang peminjaman
+        $dates = [];
+        $current = $startDate->copy();
+        while ($current->lte($endDate)) {
+            $dates[] = $current->copy();
+            $current->addDay();
+        }
+
+        if (count($dates) > 30) {
+            throw ValidationException::withMessages([
+                'end_date' => 'Peminjaman ruangan maksimal 30 hari berturut-turut.',
+            ]);
+        }
+
+        // Mengecek ketersediaan ruangan (Anti-Bentrok) untuk setiap hari dalam rentang tanggal
+        foreach ($dates as $date) {
+            $this->ensureAvailable(
+                (int) $data['room_id'],
+                $date->toDateString(),
+                $data['start_time'],
+                $data['end_time']
+            );
+        }
+
+        $totalDays = count($dates);
+        $status = $roleName === 'Admin' ? 'Disetujui' : 'Pending';
+        $approvedBy = $roleName === 'Admin' ? $request->user()->id : null;
+        $createdEvents = [];
+
+        DB::transaction(function () use ($dates, $totalDays, $data, $request, $status, $approvedBy, &$createdEvents) {
+            foreach ($dates as $index => $date) {
+                $dayNum = $index + 1;
+                $title = $totalDays > 1
+                    ? "{$data['title']} (Hari {$dayNum}/{$totalDays})"
+                    : $data['title'];
+
+                $createdEvents[] = Event::create([
+                    'user_id' => $request->user()->id,
+                    'room_id' => $data['room_id'],
+                    'title' => $title,
+                    'event_date' => $date->toDateString(),
+                    'start_time' => $data['start_time'],
+                    'end_time' => $data['end_time'],
+                    'status' => $status,
+                    'approved_by' => $approvedBy,
+                ]);
+            }
+        });
+
+        // Kirimkan notifikasi ke PIC jika status masih 'Pending'
+        if ($status === 'Pending') {
+            $room = Room::find($data['room_id']);
+            if ($room && $room->pic_id) {
+                $firstEvent = $createdEvents[0] ?? null;
+                $dateSummary = $totalDays > 1
+                    ? "{$startDate->translatedFormat('d M')} s/d {$endDate->translatedFormat('d M Y')} ({$totalDays} hari)"
+                    : $startDate->translatedFormat('d M Y');
+
+                Notification::create([
+                    'event_id' => $firstEvent?->id,
+                    'user_id' => $room->pic_id,
+                    'message' => "Pengajuan peminjaman ruangan {$room->room_name} ({$dateSummary}) dari {$request->user()->name}: {$data['title']}.",
+                ]);
+            }
+        }
+
+        if ($roleName === 'Admin') {
+            $message = $totalDays > 1
+                ? "Agenda berhasil dibuat untuk {$totalDays} hari dan langsung disetujui."
+                : 'Agenda berhasil dibuat dan langsung disetujui.';
+        } else {
+            $message = $totalDays > 1
+                ? "Agenda berhasil diajukan untuk {$totalDays} hari ({$startDate->translatedFormat('d M')} - {$endDate->translatedFormat('d M Y')}) dan menunggu persetujuan PIC."
+                : 'Agenda berhasil diajukan dan menunggu persetujuan.';
+        }
 
         return redirect()->route('events.index')->with('success', $message);
     }
@@ -252,7 +330,9 @@ class EventController extends Controller
         $data = $request->validate([
             'room_id' => ['required', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
+            'booking_type' => ['nullable', 'in:single,range'],
             'event_date' => ['required', 'date', 'after:today'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
             'start_time' => [
                 'required',
                 'date_format:H:i',
@@ -278,6 +358,7 @@ class EventController extends Controller
             ],
         ], [
             'event_date.after' => 'Tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
+            'end_date.after_or_equal' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
             'end_time.after' => 'Jam selesai harus setelah jam mulai.',
         ]);
 
