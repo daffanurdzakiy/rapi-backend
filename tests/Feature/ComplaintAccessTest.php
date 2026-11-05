@@ -653,8 +653,20 @@ class ComplaintAccessTest extends TestCase
             'status_repair' => 'Sudah Diperbaiki',
             'repair_note' => 'Kaki meja sudah diganti dan diperkuat.',
         ]);
+        // Pengaduan yang sudah diperbaiki lebih dari 24 jam yang lalu (otomatis hilang dari tampilan pengaduan fasilitas)
+        $c4 = Complaint::create([
+            'room_id' => $room->id,
+            'reporter_id' => $reporter->id,
+            'description' => 'Kerusakan Lampu Sudah Lampau',
+            'status_repair' => 'Sudah Diperbaiki',
+            'repair_note' => 'Lampu LED diganti kemarin lusa.',
+        ]);
+        DB::table('complaints')->where('id', $c4->id)->update([
+            'updated_at' => now()->subHours(25),
+            'created_at' => now()->subDays(2),
+        ]);
 
-        // 1. Filter 'semua'
+        // 1. Filter 'semua' (hanya menampilkan pengaduan aktif + yang selesai < 24 jam)
         $this->actingAs($admin)
             ->get(route('complaints.index', ['status' => 'semua']))
             ->assertOk()
@@ -662,7 +674,8 @@ class ComplaintAccessTest extends TestCase
             ->assertSee('Kerusakan Menunggu Baut')
             ->assertSee('Kerusakan Selesai Meja')
             ->assertSee('Keterangan Sudah Diperbaiki')
-            ->assertSee('Kaki meja sudah diganti dan diperkuat.');
+            ->assertSee('Kaki meja sudah diganti dan diperkuat.')
+            ->assertDontSee('Kerusakan Lampu Sudah Lampau');
 
         // 2. Filter 'belum_diperbaiki'
         $this->actingAs($admin)
@@ -670,7 +683,8 @@ class ComplaintAccessTest extends TestCase
             ->assertOk()
             ->assertSee('Kerusakan Pending AC')
             ->assertDontSee('Kerusakan Menunggu Baut')
-            ->assertDontSee('Kerusakan Selesai Meja');
+            ->assertDontSee('Kerusakan Selesai Meja')
+            ->assertDontSee('Kerusakan Lampu Sudah Lampau');
 
         // 3. Filter 'menunggu_spare_part'
         $this->actingAs($admin)
@@ -678,19 +692,30 @@ class ComplaintAccessTest extends TestCase
             ->assertOk()
             ->assertDontSee('Kerusakan Pending AC')
             ->assertSee('Kerusakan Menunggu Baut')
-            ->assertDontSee('Kerusakan Selesai Meja');
+            ->assertDontSee('Kerusakan Selesai Meja')
+            ->assertDontSee('Kerusakan Lampu Sudah Lampau');
 
-        // 4. Filter 'sudah_diperbaiki'
+        // 4. Filter 'sudah_diperbaiki' (hanya menampilkan yang < 24 jam)
         $this->actingAs($admin)
             ->get(route('complaints.index', ['status' => 'sudah_diperbaiki']))
             ->assertOk()
             ->assertDontSee('Kerusakan Pending AC')
             ->assertDontSee('Kerusakan Menunggu Baut')
             ->assertSee('Kerusakan Selesai Meja')
-            ->assertSee('Kaki meja sudah diganti dan diperkuat.');
+            ->assertSee('Kaki meja sudah diganti dan diperkuat.')
+            ->assertDontSee('Kerusakan Lampu Sudah Lampau');
+
+        // 5. Namun pada halaman Laporan PIC, laporan lama (> 24 jam) tetap tersimpan dan dapat dilihat
+        $this->actingAs($pic)
+            ->get(route('pic.complaint-reports.index', [
+                'periode' => 'mingguan',
+                'tanggal' => now()->toDateString(),
+            ]))
+            ->assertOk()
+            ->assertSee('Kerusakan Lampu Sudah Lampau');
     }
 
-    public function test_pic_must_fill_repair_note_when_marking_sudah_diperbaiki(): void
+    public function test_pic_can_fill_repair_note_optionally_when_marking_sudah_diperbaiki(): void
     {
         $pic = $this->userWithRole('PIC');
         $reporter = $this->userWithRole('Guru');
@@ -699,51 +724,59 @@ class ComplaintAccessTest extends TestCase
             'capacity' => 30,
             'pic_id' => $pic->id,
         ]);
-        $complaint = Complaint::create([
+        $complaint1 = Complaint::create([
             'room_id' => $room->id,
             'reporter_id' => $reporter->id,
             'description' => 'Kabel LAN putus',
             'status_repair' => 'Belum Diperbaiki',
         ]);
+        $complaint2 = Complaint::create([
+            'room_id' => $room->id,
+            'reporter_id' => $reporter->id,
+            'description' => 'Mouse rusak',
+            'status_repair' => 'Belum Diperbaiki',
+        ]);
 
-        // Validasi gagal jika status 'Sudah Diperbaiki' tapi repair_note kosong
+        // 1. Opsional: berhasil disimpan walau repair_note kosong
         $this->actingAs($pic)
             ->from(route('complaints.index'))
-            ->patch(route('complaints.status', $complaint), [
+            ->patch(route('complaints.status', $complaint1), [
                 'status_repair' => 'Sudah Diperbaiki',
                 'repair_note' => '',
             ])
             ->assertRedirect(route('complaints.index'))
-            ->assertSessionHasErrors(['repair_note']);
-
-        $this->assertDatabaseHas('complaints', [
-            'id' => $complaint->id,
-            'status_repair' => 'Belum Diperbaiki',
-            'repair_note' => null,
-        ]);
-
-        // Berhasil jika repair_note diisi
-        $this->actingAs($pic)
-            ->from(route('complaints.index'))
-            ->patch(route('complaints.status', $complaint), [
-                'status_repair' => 'Sudah Diperbaiki',
-                'repair_note' => 'Kabel LAN baru Cat6 telah dipasang dan diterminasi.',
-            ])
-            ->assertRedirect(route('complaints.index'))
+            ->assertSessionHasNoErrors()
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('complaints', [
-            'id' => $complaint->id,
+            'id' => $complaint1->id,
             'status_repair' => 'Sudah Diperbaiki',
-            'repair_note' => 'Kabel LAN baru Cat6 telah dipasang dan diterminasi.',
+            'repair_note' => null,
         ]);
 
-        // Cek halaman pengaduan menampilkan keterangan perbaikan
+        // 2. Berhasil jika repair_note diisi
+        $this->actingAs($pic)
+            ->from(route('complaints.index'))
+            ->patch(route('complaints.status', $complaint2), [
+                'status_repair' => 'Sudah Diperbaiki',
+                'repair_note' => 'Kabel mouse optik baru telah disambungkan.',
+            ])
+            ->assertRedirect(route('complaints.index'))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('complaints', [
+            'id' => $complaint2->id,
+            'status_repair' => 'Sudah Diperbaiki',
+            'repair_note' => 'Kabel mouse optik baru telah disambungkan.',
+        ]);
+
+        // Cek halaman pengaduan menampilkan keterangan perbaikan untuk yang diisi
         $this->actingAs($reporter)
             ->get(route('complaints.index'))
             ->assertOk()
             ->assertSee('Keterangan Sudah Diperbaiki')
-            ->assertSee('Kabel LAN baru Cat6 telah dipasang dan diterminasi.');
+            ->assertSee('Kabel mouse optik baru telah disambungkan.');
     }
 
     private function userWithRole(string $roleName): User

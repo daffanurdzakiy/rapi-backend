@@ -94,7 +94,8 @@
             Menunggu Spare Part <span class="filter-count">{{ $counts['menunggu_spare_part'] ?? 0 }}</span>
         </a>
         <a href="{{ route('complaints.index', ['status' => 'sudah_diperbaiki']) }}" 
-           class="filter-tab {{ ($currentFilter ?? '') === 'sudah_diperbaiki' ? 'active' : '' }}">
+           class="filter-tab {{ ($currentFilter ?? '') === 'sudah_diperbaiki' ? 'active' : '' }}"
+           title="Pengaduan yang sudah diperbaiki akan tampil selama 24 jam sebelum otomatis diarsipkan">
             Sudah Diperbaiki <span class="filter-count">{{ $counts['sudah_diperbaiki'] ?? 0 }}</span>
         </a>
     </div>
@@ -139,6 +140,11 @@
                                 ⚠️ Belum Diperbaiki
                             @endif
                         </span>
+                        @if($complaint->status_repair === 'Sudah Diperbaiki')
+                            <span style="display:inline-block; margin-top:4px; font-size:11px; color:#15803d; font-weight:600;">
+                                ⏱️ Tampil 24 jam (diperbaiki {{ $complaint->updated_at->diffForHumans() }})
+                            </span>
+                        @endif
                         @if($complaint->photo_path)
                             @php($photoUrl = route('complaints.show-photo', $complaint, false))
                             <a href="{{ $photoUrl }}" target="_blank" rel="noopener" aria-label="Buka foto pengaduan ukuran penuh">
@@ -185,9 +191,9 @@
 
                             <div id="repair_note_wrap_{{ $complaint->id }}" class="repair-note-wrapper" style="flex:1 1 300px; min-width:240px; {{ $complaint->status_repair === 'Sudah Diperbaiki' ? '' : 'display:none;' }}">
                                 <label for="repair_note_{{ $complaint->id }}" style="margin:0 0 4px; font-size:11.5px; color:#6d7788;">
-                                    Keterangan Sudah Diperbaiki <span style="color:#b91c1c">*</span>
+                                    Keterangan Sudah Diperbaiki <span style="font-size:11px; color:#64748b; font-weight:normal;">(Opsional)</span>
                                 </label>
-                                <textarea id="repair_note_{{ $complaint->id }}" name="repair_note" rows="2" placeholder="Tuliskan keterangan perbaikan yang telah selesai dilakukan (contoh: Lampu sudah diganti baru dan stopkontak telah diperbaiki)..." style="width:100%; min-height:36px; resize:vertical; padding:6px 10px; font-size:12.5px;">{{ old('repair_note', $complaint->repair_note) }}</textarea>
+                                <textarea id="repair_note_{{ $complaint->id }}" name="repair_note" rows="2" placeholder="Tuliskan keterangan perbaikan yang telah selesai dilakukan (opsional)..." style="width:100%; min-height:36px; resize:vertical; padding:6px 10px; font-size:12.5px;">{{ old('repair_note', $complaint->repair_note) }}</textarea>
                             </div>
 
                             <div style="align-self:flex-end;">
@@ -213,10 +219,12 @@
         @empty
             <div style="text-align:center; padding:32px 16px;">
                 <p class="muted" style="margin:0; font-size:14px;">
-                    @if(($currentFilter ?? 'semua') !== 'semua')
-                        Tidak ada pengaduan dengan status <b>{{ $currentFilter === 'belum_diperbaiki' ? 'Belum Diperbaiki' : ($currentFilter === 'menunggu_spare_part' ? 'Menunggu Spare Part' : 'Sudah Diperbaiki') }}</b>.
+                    @if(($currentFilter ?? 'semua') === 'sudah_diperbaiki')
+                        Tidak ada pengaduan yang sudah diperbaiki dalam kurun waktu 24 jam terakhir.
+                    @elseif(($currentFilter ?? 'semua') !== 'semua')
+                        Tidak ada pengaduan dengan status <b>{{ $currentFilter === 'belum_diperbaiki' ? 'Belum Diperbaiki' : 'Menunggu Spare Part' }}</b>.
                     @else
-                        Belum ada pengaduan fasilitas.
+                        Belum ada pengaduan fasilitas aktif.
                     @endif
                 </p>
                 @if(($currentFilter ?? 'semua') !== 'semua')
@@ -242,14 +250,9 @@
                     var textarea = noteWrap.querySelector('textarea');
                     if (textarea) {
                         textarea.focus();
-                        textarea.required = true;
                     }
                 } else {
                     noteWrap.style.display = 'none';
-                    var textarea = noteWrap.querySelector('textarea');
-                    if (textarea) {
-                        textarea.required = false;
-                    }
                 }
             });
         });

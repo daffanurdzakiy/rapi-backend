@@ -32,12 +32,22 @@ class ComplaintController extends Controller
             $baseQuery->where('reporter_id', $request->user()->id);
         }
 
+        // Batas waktu 24 jam untuk laporan yang 'Sudah Diperbaiki' agar tetap tampil di halaman pengaduan fasilitas.
+        // Setelah melewati kurun waktu 24 jam sejak diperbaiki, kartu laporan otomatis tidak ditampilkan di menu ini
+        // (namun data di database tetap utuh dan tetap muncul pada menu laporan/rekap).
+        $repairedCutoff = now()->subHours(24);
+
         // Menghitung jumlah per status untuk badge filter: semua, belum diperbaiki, menunggu spare part, dan sudah diperbaiki
         $counts = [
-            'semua' => (clone $baseQuery)->count(),
+            'semua' => (clone $baseQuery)->where(function ($q) use ($repairedCutoff) {
+                $q->where('status_repair', '!=', 'Sudah Diperbaiki')
+                  ->orWhere('updated_at', '>=', $repairedCutoff);
+            })->count(),
             'belum_diperbaiki' => (clone $baseQuery)->where('status_repair', 'Belum Diperbaiki')->count(),
             'menunggu_spare_part' => (clone $baseQuery)->where('status_repair', 'Menunggu Spare Part')->count(),
-            'sudah_diperbaiki' => (clone $baseQuery)->where('status_repair', 'Sudah Diperbaiki')->count(),
+            'sudah_diperbaiki' => (clone $baseQuery)->where('status_repair', 'Sudah Diperbaiki')
+                ->where('updated_at', '>=', $repairedCutoff)
+                ->count(),
         ];
 
         // Memfilter query pengaduan sesuai filter yang dipilih
@@ -53,12 +63,22 @@ class ComplaintController extends Controller
 
         $currentStatus = 'semua';
         if (isset($statusMap[$filter])) {
-            $baseQuery->where('status_repair', $statusMap[$filter]);
-            $currentStatus = array_search($statusMap[$filter], [
+            $mapped = $statusMap[$filter];
+            $baseQuery->where('status_repair', $mapped);
+            if ($mapped === 'Sudah Diperbaiki') {
+                $baseQuery->where('updated_at', '>=', $repairedCutoff);
+            }
+            $currentStatus = array_search($mapped, [
                 'belum_diperbaiki' => 'Belum Diperbaiki',
                 'menunggu_spare_part' => 'Menunggu Spare Part',
                 'sudah_diperbaiki' => 'Sudah Diperbaiki',
             ], true) ?: 'semua';
+        } else {
+            // Default filter 'semua': tidak menyertakan yang sudah diperbaiki lebih dari 24 jam lalu
+            $baseQuery->where(function ($q) use ($repairedCutoff) {
+                $q->where('status_repair', '!=', 'Sudah Diperbaiki')
+                  ->orWhere('updated_at', '>=', $repairedCutoff);
+            });
         }
 
         $complaints = $baseQuery->latest()->get();
@@ -213,12 +233,11 @@ class ComplaintController extends Controller
                 && $complaint->room->pic_id === $request->user()->id,
             403,
         );
-        // Validasi status perbaikan dan catatan keterangan (wajib diisi saat status 'Sudah Diperbaiki')
+        // Validasi status perbaikan dan catatan keterangan (keterangan bersifat opsional)
         $data = $request->validate([
             'status_repair' => ['required', 'in:Belum Diperbaiki,Menunggu Spare Part,Sudah Diperbaiki'],
-            'repair_note' => ['nullable', 'required_if:status_repair,Sudah Diperbaiki', 'string', 'max:2000'],
+            'repair_note' => ['nullable', 'string', 'max:2000'],
         ], [
-            'repair_note.required_if' => 'Keterangan sudah diperbaiki wajib diisi saat status diubah menjadi Sudah Diperbaiki.',
             'repair_note.max' => 'Keterangan perbaikan maksimal 2000 karakter.',
         ]);
 

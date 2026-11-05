@@ -46,9 +46,21 @@ class ComplaintController extends ApiController
             $query->where('reporter_id', $user->id);
         }
 
+        $repairedCutoff = now()->subHours(24);
+
         // Filter opsional berdasarkan status perbaikan (?status_repair=Belum Diperbaiki)
         if ($request->filled('status_repair')) {
-            $query->where('status_repair', $request->input('status_repair'));
+            $statusRepair = $request->input('status_repair');
+            $query->where('status_repair', $statusRepair);
+            if ($statusRepair === 'Sudah Diperbaiki' && ! $request->boolean('include_archived')) {
+                $query->where('updated_at', '>=', $repairedCutoff);
+            }
+        } elseif (! $request->boolean('include_archived')) {
+            // Default: tidak menampilkan pengaduan yang sudah diperbaiki lebih dari 24 jam lalu
+            $query->where(function ($q) use ($repairedCutoff) {
+                $q->where('status_repair', '!=', 'Sudah Diperbaiki')
+                  ->orWhere('updated_at', '>=', $repairedCutoff);
+            });
         }
 
         // Filter opsional berdasarkan ID ruangan (?room_id=1)
@@ -181,13 +193,12 @@ class ComplaintController extends ApiController
             return $this->sendError('Hanya PIC penanggung jawab ruangan yang dapat mengubah status perbaikan.', null, 403);
         }
 
-        // Validasi pilihan status perbaikan yang diizinkan dan keterangan perbaikan
+        // Validasi pilihan status perbaikan yang diizinkan dan keterangan perbaikan (keterangan bersifat opsional)
         // Jika ingin mengubah atau mengatur opsi status baru (misal: 'Sedang Dikerjakan'), tambahkan pada aturan `'in:...'` di bawah.
         $validator = Validator::make($request->all(), [
             'status_repair' => ['required', 'in:Belum Diperbaiki,Menunggu Spare Part,Sudah Diperbaiki'],
-            'repair_note' => ['nullable', 'required_if:status_repair,Sudah Diperbaiki', 'string', 'max:2000'],
+            'repair_note' => ['nullable', 'string', 'max:2000'],
         ], [
-            'repair_note.required_if' => 'Keterangan sudah diperbaiki wajib diisi ketika status diubah menjadi Sudah Diperbaiki.',
             'repair_note.max' => 'Keterangan perbaikan maksimal 2000 karakter.',
         ]);
 
