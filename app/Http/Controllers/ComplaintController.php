@@ -24,14 +24,44 @@ class ComplaintController extends Controller
     // - Guru & Organisasi: hanya melihat pengaduan yang mereka laporkan sendiri.
     public function index(Request $request): View
     {
-        $query = Complaint::with(['room.pic', 'reporter'])->latest();
+        $baseQuery = Complaint::with(['room.pic', 'reporter']);
         $role = $request->user()->role?->role_name;
         if ($role === 'PIC') {
-            $query->whereHas('room', fn ($roomQuery) => $roomQuery->where('pic_id', $request->user()->id));
+            $baseQuery->whereHas('room', fn ($roomQuery) => $roomQuery->where('pic_id', $request->user()->id));
         } elseif (in_array($role, ['Guru', 'Organisasi'])) {
-            $query->where('reporter_id', $request->user()->id);
+            $baseQuery->where('reporter_id', $request->user()->id);
         }
-        $complaints = $query->get();
+
+        // Menghitung jumlah per status untuk badge filter: semua, belum diperbaiki, menunggu spare part, dan sudah diperbaiki
+        $counts = [
+            'semua' => (clone $baseQuery)->count(),
+            'belum_diperbaiki' => (clone $baseQuery)->where('status_repair', 'Belum Diperbaiki')->count(),
+            'menunggu_spare_part' => (clone $baseQuery)->where('status_repair', 'Menunggu Spare Part')->count(),
+            'sudah_diperbaiki' => (clone $baseQuery)->where('status_repair', 'Sudah Diperbaiki')->count(),
+        ];
+
+        // Memfilter query pengaduan sesuai filter yang dipilih
+        $filter = $request->query('status', 'semua');
+        $statusMap = [
+            'belum_diperbaiki' => 'Belum Diperbaiki',
+            'Belum Diperbaiki' => 'Belum Diperbaiki',
+            'menunggu_spare_part' => 'Menunggu Spare Part',
+            'Menunggu Spare Part' => 'Menunggu Spare Part',
+            'sudah_diperbaiki' => 'Sudah Diperbaiki',
+            'Sudah Diperbaiki' => 'Sudah Diperbaiki',
+        ];
+
+        $currentStatus = 'semua';
+        if (isset($statusMap[$filter])) {
+            $baseQuery->where('status_repair', $statusMap[$filter]);
+            $currentStatus = array_search($statusMap[$filter], [
+                'belum_diperbaiki' => 'Belum Diperbaiki',
+                'menunggu_spare_part' => 'Menunggu Spare Part',
+                'sudah_diperbaiki' => 'Sudah Diperbaiki',
+            ], true) ?: 'semua';
+        }
+
+        $complaints = $baseQuery->latest()->get();
         $whatsappWarnings = [];
 
         // Pembuatan link otomatis WhatsApp (wa.me) untuk Admin menegur PIC jika status masih 'Belum Diperbaiki'.
@@ -72,6 +102,8 @@ class ComplaintController extends Controller
             'complaints' => $complaints,
             'canReport' => in_array($role, ['Guru', 'Organisasi']),
             'whatsappWarnings' => $whatsappWarnings,
+            'counts' => $counts,
+            'currentFilter' => $currentStatus,
         ]);
     }
 
@@ -173,7 +205,7 @@ class ComplaintController extends Controller
     }
 
     /** Let the PIC responsible for the room change a complaint to a permitted repair state. */
-    // Mengubah status perbaikan oleh PIC ruangan ('Belum Diperbaiki', 'Menunggu Spare Part', 'Sudah Diperbaiki').
+    // Mengubah status perbaikan oleh PIC ruangan ('Belum Diperbaiki', 'Menunggu Spare Part', 'Sudah Diperbaiki') beserta catatan keterangan perbaikan.
     public function updateStatus(Request $request, Complaint $complaint): RedirectResponse
     {
         abort_unless(
@@ -181,9 +213,29 @@ class ComplaintController extends Controller
                 && $complaint->room->pic_id === $request->user()->id,
             403,
         );
-        // Daftar status perbaikan yang diizinkan untuk dipilih oleh PIC.
-        $data = $request->validate(['status_repair' => ['required', 'in:Belum Diperbaiki,Menunggu Spare Part,Sudah Diperbaiki']]);
-        $complaint->update($data);
+        // Validasi status perbaikan dan catatan keterangan (wajib diisi saat status 'Sudah Diperbaiki')
+        $data = $request->validate([
+            'status_repair' => ['required', 'in:Belum Diperbaiki,Menunggu Spare Part,Sudah Diperbaiki'],
+            'repair_note' => ['nullable', 'required_if:status_repair,Sudah Diperbaiki', 'string', 'max:2000'],
+        ], [
+            'repair_note.required_if' => 'Keterangan sudah diperbaiki wajib diisi saat status diubah menjadi Sudah Diperbaiki.',
+            'repair_note.max' => 'Keterangan perbaikan maksimal 2000 karakter.',
+        ]);
+
+        $updateData = ['status_repair' => $data['status_repair']];
+        if ($data['status_repair'] === 'Sudah Diperbaiki' || array_key_exists('repair_note', $data)) {
+            $updateData['repair_note'] = $data['repair_note'] ?? null;
+        }
+
+        $complaint->update($updateData);
+
+        // Notifikasi ke pelapor pengaduan jika status diupdate oleh PIC
+        $noteSnippet = ! empty($data['repair_note']) ? " Keterangan: {$data['repair_note']}" : '';
+        Notification::create([
+            'complaint_id' => $complaint->id,
+            'user_id' => $complaint->reporter_id,
+            'message' => "Status perbaikan pengaduan di {$complaint->room->room_name} diperbarui menjadi: {$data['status_repair']}.{$noteSnippet}",
+        ]);
 
         return back()->with('success', 'Status perbaikan berhasil diperbarui.');
     }

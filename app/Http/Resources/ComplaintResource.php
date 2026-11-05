@@ -32,6 +32,8 @@ class ComplaintResource extends JsonResource
             'photo_api_url' => $this->photo_path ? url('/api/complaints/' . $this->id . '/photo') : null,
             // Status perbaikan: 'Belum Diperbaiki', 'Menunggu Spare Part', atau 'Sudah Diperbaiki'
             'status_repair' => $this->status_repair,
+            // Keterangan perbaikan dari PIC ketika status 'Sudah Diperbaiki'
+            'repair_note' => $this->repair_note,
             // Format waktu standar internasional ISO-8601 agar mudah di-parse oleh Flutter (DateTime.parse)
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

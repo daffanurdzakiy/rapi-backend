@@ -111,3 +111,13 @@ Route::get('/init-storage', function () {
         return 'Info: ' . $e->getMessage();
     }
 });
+
+// Route bantuan untuk menjalankan migrasi database otomatis di hosting cPanel
+Route::get('/init-migrate', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        return 'Migrasi database berhasil dijalankan di server hosting: <pre>' . \Illuminate\Support\Facades\Artisan::output() . '</pre>';
+    } catch (\Exception $e) {
+        return 'Info migrasi: ' . $e->getMessage();
+    }
+});

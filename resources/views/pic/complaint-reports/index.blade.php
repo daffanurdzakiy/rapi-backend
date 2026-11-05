@@ -89,7 +89,14 @@
                         <td>{{ $complaint->created_at->format('d/m/Y') }}</td>
                         <td>{{ $complaint->created_at->format('H:i') }}</td>
                         <td>{{ $complaint->room->room_name }}</td>
-                        <td>{{ $complaint->description }}</td>
+                        <td>
+                            <div>{{ $complaint->description }}</div>
+                            @if($complaint->repair_note)
+                                <div style="margin-top:4px; font-size:11.5px; color:#166534; font-weight:600;">
+                                    ✓ Keterangan Perbaikan: {{ $complaint->repair_note }}
+                                </div>
+                            @endif
+                        </td>
                         <td>{{ $complaint->reporter->name }}</td>
                         <td>{{ $complaint->status_repair }}</td>
                         <td class="evidence-column">

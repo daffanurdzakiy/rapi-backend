@@ -623,6 +623,129 @@ class ComplaintAccessTest extends TestCase
         Storage::disk('public')->assertExists($complaint->photo_path);
     }
 
+    public function test_complaints_can_be_filtered_by_status(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $reporter = $this->userWithRole('Guru');
+        $pic = $this->userWithRole('PIC');
+        $room = Room::create([
+            'room_name' => 'Ruang Uji Filter',
+            'capacity' => 25,
+            'pic_id' => $pic->id,
+        ]);
+
+        $c1 = Complaint::create([
+            'room_id' => $room->id,
+            'reporter_id' => $reporter->id,
+            'description' => 'Kerusakan Pending AC',
+            'status_repair' => 'Belum Diperbaiki',
+        ]);
+        $c2 = Complaint::create([
+            'room_id' => $room->id,
+            'reporter_id' => $reporter->id,
+            'description' => 'Kerusakan Menunggu Baut',
+            'status_repair' => 'Menunggu Spare Part',
+        ]);
+        $c3 = Complaint::create([
+            'room_id' => $room->id,
+            'reporter_id' => $reporter->id,
+            'description' => 'Kerusakan Selesai Meja',
+            'status_repair' => 'Sudah Diperbaiki',
+            'repair_note' => 'Kaki meja sudah diganti dan diperkuat.',
+        ]);
+
+        // 1. Filter 'semua'
+        $this->actingAs($admin)
+            ->get(route('complaints.index', ['status' => 'semua']))
+            ->assertOk()
+            ->assertSee('Kerusakan Pending AC')
+            ->assertSee('Kerusakan Menunggu Baut')
+            ->assertSee('Kerusakan Selesai Meja')
+            ->assertSee('Keterangan Sudah Diperbaiki')
+            ->assertSee('Kaki meja sudah diganti dan diperkuat.');
+
+        // 2. Filter 'belum_diperbaiki'
+        $this->actingAs($admin)
+            ->get(route('complaints.index', ['status' => 'belum_diperbaiki']))
+            ->assertOk()
+            ->assertSee('Kerusakan Pending AC')
+            ->assertDontSee('Kerusakan Menunggu Baut')
+            ->assertDontSee('Kerusakan Selesai Meja');
+
+        // 3. Filter 'menunggu_spare_part'
+        $this->actingAs($admin)
+            ->get(route('complaints.index', ['status' => 'menunggu_spare_part']))
+            ->assertOk()
+            ->assertDontSee('Kerusakan Pending AC')
+            ->assertSee('Kerusakan Menunggu Baut')
+            ->assertDontSee('Kerusakan Selesai Meja');
+
+        // 4. Filter 'sudah_diperbaiki'
+        $this->actingAs($admin)
+            ->get(route('complaints.index', ['status' => 'sudah_diperbaiki']))
+            ->assertOk()
+            ->assertDontSee('Kerusakan Pending AC')
+            ->assertDontSee('Kerusakan Menunggu Baut')
+            ->assertSee('Kerusakan Selesai Meja')
+            ->assertSee('Kaki meja sudah diganti dan diperkuat.');
+    }
+
+    public function test_pic_must_fill_repair_note_when_marking_sudah_diperbaiki(): void
+    {
+        $pic = $this->userWithRole('PIC');
+        $reporter = $this->userWithRole('Guru');
+        $room = Room::create([
+            'room_name' => 'Lab Komputer PIC',
+            'capacity' => 30,
+            'pic_id' => $pic->id,
+        ]);
+        $complaint = Complaint::create([
+            'room_id' => $room->id,
+            'reporter_id' => $reporter->id,
+            'description' => 'Kabel LAN putus',
+            'status_repair' => 'Belum Diperbaiki',
+        ]);
+
+        // Validasi gagal jika status 'Sudah Diperbaiki' tapi repair_note kosong
+        $this->actingAs($pic)
+            ->from(route('complaints.index'))
+            ->patch(route('complaints.status', $complaint), [
+                'status_repair' => 'Sudah Diperbaiki',
+                'repair_note' => '',
+            ])
+            ->assertRedirect(route('complaints.index'))
+            ->assertSessionHasErrors(['repair_note']);
+
+        $this->assertDatabaseHas('complaints', [
+            'id' => $complaint->id,
+            'status_repair' => 'Belum Diperbaiki',
+            'repair_note' => null,
+        ]);
+
+        // Berhasil jika repair_note diisi
+        $this->actingAs($pic)
+            ->from(route('complaints.index'))
+            ->patch(route('complaints.status', $complaint), [
+                'status_repair' => 'Sudah Diperbaiki',
+                'repair_note' => 'Kabel LAN baru Cat6 telah dipasang dan diterminasi.',
+            ])
+            ->assertRedirect(route('complaints.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('complaints', [
+            'id' => $complaint->id,
+            'status_repair' => 'Sudah Diperbaiki',
+            'repair_note' => 'Kabel LAN baru Cat6 telah dipasang dan diterminasi.',
+        ]);
+
+        // Cek halaman pengaduan menampilkan keterangan perbaikan
+        $this->actingAs($reporter)
+            ->get(route('complaints.index'))
+            ->assertOk()
+            ->assertSee('Keterangan Sudah Diperbaiki')
+            ->assertSee('Kabel LAN baru Cat6 telah dipasang dan diterminasi.');
+    }
+
     private function userWithRole(string $roleName): User
     {
         $roleId = DB::table('roles')->where('role_name', $roleName)->value('id')

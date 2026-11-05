@@ -181,10 +181,14 @@ class ComplaintController extends ApiController
             return $this->sendError('Hanya PIC penanggung jawab ruangan yang dapat mengubah status perbaikan.', null, 403);
         }
 
-        // Validasi pilihan status perbaikan yang diizinkan
+        // Validasi pilihan status perbaikan yang diizinkan dan keterangan perbaikan
         // Jika ingin mengubah atau mengatur opsi status baru (misal: 'Sedang Dikerjakan'), tambahkan pada aturan `'in:...'` di bawah.
         $validator = Validator::make($request->all(), [
             'status_repair' => ['required', 'in:Belum Diperbaiki,Menunggu Spare Part,Sudah Diperbaiki'],
+            'repair_note' => ['nullable', 'required_if:status_repair,Sudah Diperbaiki', 'string', 'max:2000'],
+        ], [
+            'repair_note.required_if' => 'Keterangan sudah diperbaiki wajib diisi ketika status diubah menjadi Sudah Diperbaiki.',
+            'repair_note.max' => 'Keterangan perbaikan maksimal 2000 karakter.',
         ]);
 
         if ($validator->fails()) {
@@ -192,14 +196,20 @@ class ComplaintController extends ApiController
         }
 
         $data = $validator->validated();
-        $complaint->update(['status_repair' => $data['status_repair']]);
+        $updateData = ['status_repair' => $data['status_repair']];
+        if ($data['status_repair'] === 'Sudah Diperbaiki' || array_key_exists('repair_note', $data)) {
+            $updateData['repair_note'] = $data['repair_note'] ?? null;
+        }
+
+        $complaint->update($updateData);
 
         // Notify reporter about updated repair status
         // Kirim notifikasi ke pelapor bahwa status perbaikan ruangannya telah diperbarui oleh PIC/Admin
+        $noteInfo = ! empty($data['repair_note']) ? " Keterangan: {$data['repair_note']}" : '';
         Notification::create([
             'complaint_id' => $complaint->id,
             'user_id' => $complaint->reporter_id,
-            'message' => "Status perbaikan pengaduan di {$complaint->room->room_name} diperbarui menjadi: {$data['status_repair']}.",
+            'message' => "Status perbaikan pengaduan di {$complaint->room->room_name} diperbarui menjadi: {$data['status_repair']}.{$noteInfo}",
         ]);
 
         return $this->sendResponse(
