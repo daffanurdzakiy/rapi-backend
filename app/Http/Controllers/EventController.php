@@ -32,7 +32,15 @@ class EventController extends Controller
             $query->where('user_id', $user->id);
         }
 
-        $allEvents = $query->get();
+        $rawEvents = $query->get();
+
+        // Pada tampilan Jadwal Ruangan / Manajemen Agenda:
+        // Agenda yang sudah terlaksana hanya ditampilkan dalam kurun waktu 2 hari (48 jam) setelah selesai.
+        // Setelah melewati 2 hari, kartu agenda tersebut otomatis hilang dari tampilan ini,
+        // namun data di database dan menu laporan rekap tetap tersimpan utuh.
+        $allEvents = $rawEvents->reject(function ($event) {
+            return $event->isCompletedExpired(48);
+        })->values();
 
         // Menghitung jumlah per status (otomatis berdasarkan waktu pelaksanaan agenda)
         $counts = [

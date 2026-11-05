@@ -50,7 +50,7 @@ class EventExecutionStatusTest extends TestCase
         ]);
         $this->assertSame('Sedang Berlangsung', $eventOngoing->execution_status);
 
-        // 3. Disetujui & Waktu Sudah Selesai -> 'Sudah Terlaksana'
+        // 3. Disetujui & Waktu Sudah Selesai (Kemarin / < 2 Hari) -> 'Sudah Terlaksana' (Masih tampil)
         $eventCompleted = Event::create([
             'user_id' => $guru->id,
             'room_id' => $room->id,
@@ -62,6 +62,21 @@ class EventExecutionStatusTest extends TestCase
             'approved_by' => $admin->id,
         ]);
         $this->assertSame('Sudah Terlaksana', $eventCompleted->execution_status);
+        $this->assertFalse($eventCompleted->isCompletedExpired(48));
+
+        // 3b. Disetujui & Waktu Sudah Selesai Lebih dari 2 Hari Lalu -> Otomatis Hilang dari Jadwal Ruangan
+        $eventExpired = Event::create([
+            'user_id' => $guru->id,
+            'room_id' => $room->id,
+            'title' => 'Agenda Jadwal Lama 4 Hari Lalu',
+            'event_date' => Carbon::today()->subDays(4)->toDateString(),
+            'start_time' => '08:00:00',
+            'end_time' => '10:00:00',
+            'status' => 'Disetujui',
+            'approved_by' => $admin->id,
+        ]);
+        $this->assertSame('Sudah Terlaksana', $eventExpired->execution_status);
+        $this->assertTrue($eventExpired->isCompletedExpired(48));
 
         // 4. Ditolak -> 'Ditolak'
         $eventRejected = Event::create([
@@ -133,8 +148,23 @@ class EventExecutionStatusTest extends TestCase
             ->get(route('events.index', ['status' => 'sudah_terlaksana']))
             ->assertOk()
             ->assertSee('Rapat Kemarin')
+            ->assertDontSee('Agenda Jadwal Lama 4 Hari Lalu')
             ->assertDontSee('Workshop Coding Live')
             ->assertDontSee('Seminar Pendidikan Masa Depan');
+
+        // Pastikan agenda lama tetap ada di Database dan Menu Laporan Admin
+        $this->assertDatabaseHas('events', [
+            'id' => $eventExpired->id,
+            'title' => 'Agenda Jadwal Lama 4 Hari Lalu',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.reports.index', [
+                'periode' => 'bulanan',
+                'tanggal' => Carbon::today()->toDateString(),
+            ]))
+            ->assertOk()
+            ->assertSee('Agenda Jadwal Lama 4 Hari Lalu');
     }
 
     private function userWithRole(string $roleName): User

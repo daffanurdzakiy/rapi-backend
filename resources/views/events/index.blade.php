@@ -143,7 +143,8 @@
         Belum Terlaksana <span class="filter-count">{{ $counts['belum_terlaksana'] ?? 0 }}</span>
     </a>
     <a href="{{ route('events.index', ['status' => 'sudah_terlaksana']) }}"
-       class="filter-tab {{ $current === 'sudah_terlaksana' ? 'active' : '' }}">
+       class="filter-tab {{ $current === 'sudah_terlaksana' ? 'active' : '' }}"
+       title="Agenda yang sudah terlaksana akan tampil selama 2 hari sebelum otomatis diarsipkan">
         Sudah Terlaksana <span class="filter-count">{{ $counts['sudah_terlaksana'] ?? 0 }}</span>
     </a>
     <a href="{{ route('events.index', ['status' => 'menunggu_persetujuan']) }}"

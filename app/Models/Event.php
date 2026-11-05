@@ -113,4 +113,34 @@ class Event extends Model
             default => '',
         };
     }
+
+    /**
+     * Mengecek apakah agenda yang sudah terlaksana telah melewati batas retensi tampilan (2 hari / 48 jam).
+     * Jika sudah lewat lebih dari 2 hari sejak waktu selesai, agenda otomatis disembunyikan
+     * dari menu utama Jadwal Ruangan / Manajemen Agenda (data di database dan laporan tetap tersimpan utuh).
+     */
+    public function isCompletedExpired(int $hours = 48): bool
+    {
+        if ($this->execution_status !== 'Sudah Terlaksana') {
+            return false;
+        }
+
+        try {
+            $dateStr = $this->event_date instanceof \DateTimeInterface
+                ? $this->event_date->format('Y-m-d')
+                : substr((string) $this->event_date, 0, 10);
+
+            $endTime = substr((string) $this->end_time, 0, 8);
+            if (strlen($endTime) === 5) {
+                $endTime .= ':00';
+            }
+
+            $endDateTime = Carbon::parse("{$dateStr} {$endTime}", 'Asia/Jakarta');
+            $cutoff = now('Asia/Jakarta')->subHours($hours);
+
+            return $endDateTime->lt($cutoff);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
 }
