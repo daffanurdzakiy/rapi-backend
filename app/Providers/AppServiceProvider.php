@@ -19,6 +19,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('complaints') && ! \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'repair_note')) {
+                \Illuminate\Support\Facades\Schema::table('complaints', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    $table->text('repair_note')->nullable()->after('status_repair');
+                });
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika database belum siap/terhubung
+        }
     }
 }

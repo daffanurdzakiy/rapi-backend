@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Complaint;
 use App\Models\Notification;
 use App\Models\Room;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -17,6 +19,20 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 // Controller untuk mengelola Pengaduan Kerusakan Fasilitas Ruangan di Web.
 class ComplaintController extends Controller
 {
+    /** Pastikan kolom repair_note tersedia pada tabel complaints (otomatis memperbaiki jika belum migrasi di hosting). */
+    protected function ensureRepairNoteColumnExists(): void
+    {
+        try {
+            if (Schema::hasTable('complaints') && ! Schema::hasColumn('complaints', 'repair_note')) {
+                Schema::table('complaints', function (Blueprint $table) {
+                    $table->text('repair_note')->nullable()->after('status_repair');
+                });
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika tidak memiliki hak akses alter table atau sedang dalam proses
+        }
+    }
+
     /** Show complaints according to the viewer's role. */
     // Menampilkan daftar pengaduan sesuai Role:
     // - Admin: melihat semua pengaduan + tombol peringatan WhatsApp ke PIC.
@@ -24,6 +40,8 @@ class ComplaintController extends Controller
     // - Guru & Organisasi: hanya melihat pengaduan yang mereka laporkan sendiri.
     public function index(Request $request): View
     {
+        $this->ensureRepairNoteColumnExists();
+
         $baseQuery = Complaint::with(['room.pic', 'reporter']);
         $role = $request->user()->role?->role_name;
         if ($role === 'PIC') {
@@ -241,8 +259,17 @@ class ComplaintController extends Controller
             'repair_note.max' => 'Keterangan perbaikan maksimal 2000 karakter.',
         ]);
 
+        $this->ensureRepairNoteColumnExists();
+
         $updateData = ['status_repair' => $data['status_repair']];
-        if ($data['status_repair'] === 'Sudah Diperbaiki' || array_key_exists('repair_note', $data)) {
+        $hasRepairNoteColumn = false;
+        try {
+            $hasRepairNoteColumn = Schema::hasColumn('complaints', 'repair_note');
+        } catch (\Throwable $e) {
+            $hasRepairNoteColumn = false;
+        }
+
+        if ($hasRepairNoteColumn && ($data['status_repair'] === 'Sudah Diperbaiki' || array_key_exists('repair_note', $data))) {
             $updateData['repair_note'] = $data['repair_note'] ?? null;
         }
 

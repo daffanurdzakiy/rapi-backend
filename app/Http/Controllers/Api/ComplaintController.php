@@ -206,9 +206,26 @@ class ComplaintController extends ApiController
             return $this->sendError('Validasi gagal.', $validator->errors(), 422);
         }
 
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('complaints') && ! \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'repair_note')) {
+                \Illuminate\Support\Facades\Schema::table('complaints', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    $table->text('repair_note')->nullable()->after('status_repair');
+                });
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika alter table gagal
+        }
+
         $data = $validator->validated();
         $updateData = ['status_repair' => $data['status_repair']];
-        if ($data['status_repair'] === 'Sudah Diperbaiki' || array_key_exists('repair_note', $data)) {
+        $hasRepairNoteColumn = false;
+        try {
+            $hasRepairNoteColumn = \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'repair_note');
+        } catch (\Throwable $e) {
+            $hasRepairNoteColumn = false;
+        }
+
+        if ($hasRepairNoteColumn && ($data['status_repair'] === 'Sudah Diperbaiki' || array_key_exists('repair_note', $data))) {
             $updateData['repair_note'] = $data['repair_note'] ?? null;
         }
 
