@@ -44,17 +44,19 @@ class DashboardController extends Controller
             default => collect(),
         };
 
-        // Mengambil 5 agenda peminjaman ruangan yang berstatus Pending atau Disetujui (tidak menampilkan yang sudah selesai lebih dari 2 hari).
+        // Mengambil 5 agenda peminjaman ruangan yang berstatus Pending atau Disetujui (diurutkan dari hari ini, dan tidak menampilkan yang sudah selesai setelah ganti hari).
+        $today = now('Asia/Jakarta')->toDateString();
         $recentEvents = Event::with(['room', 'user'])
             ->whereIn('status', ['Pending', 'Disetujui'])
             ->when(
                 $role === 'PIC',
                 fn ($query) => $query->whereHas('room', fn ($roomQuery) => $roomQuery->where('pic_id', $user->id)),
             )
-            ->orderBy('event_date')
-            ->orderBy('start_time')
+            ->orderByRaw('CASE WHEN event_date >= ? THEN 0 ELSE 1 END', [$today])
+            ->orderBy('event_date', 'asc')
+            ->orderBy('start_time', 'asc')
             ->get()
-            ->reject(fn ($event) => $event->isCompletedExpired(48))
+            ->reject(fn ($event) => $event->isCompletedExpired())
             ->take(5);
 
         $featuredRoomSchedules = collect(['Wijaya', 'Dak'])->mapWithKeys(function (string $roomName) {

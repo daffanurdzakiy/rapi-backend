@@ -24,18 +24,30 @@ class EventExecutionStatusTest extends TestCase
             'pic_id' => $admin->id,
         ]);
 
-        // 1. Disetujui & Masa Depan -> 'Belum Terlaksana'
-        $eventUpcoming = Event::create([
+        // 1. Disetujui & Besok -> 'Belum Terlaksana'
+        $eventUpcomingTomorrow = Event::create([
             'user_id' => $guru->id,
             'room_id' => $room->id,
-            'title' => 'Seminar Pendidikan Masa Depan',
+            'title' => 'Seminar Besok',
             'event_date' => Carbon::tomorrow()->toDateString(),
             'start_time' => '08:00:00',
             'end_time' => '11:00:00',
             'status' => 'Disetujui',
             'approved_by' => $admin->id,
         ]);
-        $this->assertSame('Belum Terlaksana', $eventUpcoming->execution_status);
+        $this->assertSame('Belum Terlaksana', $eventUpcomingTomorrow->execution_status);
+
+        // 1b. Disetujui & Lusa -> 'Belum Terlaksana' (Untuk verifikasi urutan ke bawah)
+        $eventUpcomingLusa = Event::create([
+            'user_id' => $guru->id,
+            'room_id' => $room->id,
+            'title' => 'Lomba Lusa',
+            'event_date' => Carbon::today()->addDays(2)->toDateString(),
+            'start_time' => '09:00:00',
+            'end_time' => '12:00:00',
+            'status' => 'Disetujui',
+            'approved_by' => $admin->id,
+        ]);
 
         // 2. Disetujui & Sedang Berlangsung Hari Ini -> 'Sedang Berlangsung'
         $eventOngoing = Event::create([
@@ -50,33 +62,33 @@ class EventExecutionStatusTest extends TestCase
         ]);
         $this->assertSame('Sedang Berlangsung', $eventOngoing->execution_status);
 
-        // 3. Disetujui & Waktu Sudah Selesai (Kemarin / < 2 Hari) -> 'Sudah Terlaksana' (Masih tampil)
-        $eventCompleted = Event::create([
+        // 3. Disetujui & Selesai Hari Ini -> 'Sudah Terlaksana' (Masih tampil hingga 23:59)
+        $eventCompletedToday = Event::create([
             'user_id' => $guru->id,
             'room_id' => $room->id,
-            'title' => 'Rapat Kemarin',
+            'title' => 'Rapat Pagi Tadi',
+            'event_date' => Carbon::today()->toDateString(),
+            'start_time' => Carbon::now()->subHours(3)->format('H:i:s'),
+            'end_time' => Carbon::now()->subHours(1)->format('H:i:s'),
+            'status' => 'Disetujui',
+            'approved_by' => $admin->id,
+        ]);
+        $this->assertSame('Sudah Terlaksana', $eventCompletedToday->execution_status);
+        $this->assertFalse($eventCompletedToday->isCompletedExpired());
+
+        // 3b. Disetujui & Selesai Kemarin -> Sudah ganti hari, otomatis HILANG setelah jam 23:59
+        $eventExpiredYesterday = Event::create([
+            'user_id' => $guru->id,
+            'room_id' => $room->id,
+            'title' => 'Agenda Kemarin Sudah Lewat',
             'event_date' => Carbon::yesterday()->toDateString(),
             'start_time' => '08:00:00',
             'end_time' => '10:00:00',
             'status' => 'Disetujui',
             'approved_by' => $admin->id,
         ]);
-        $this->assertSame('Sudah Terlaksana', $eventCompleted->execution_status);
-        $this->assertFalse($eventCompleted->isCompletedExpired(48));
-
-        // 3b. Disetujui & Waktu Sudah Selesai Lebih dari 2 Hari Lalu -> Otomatis Hilang dari Jadwal Ruangan
-        $eventExpired = Event::create([
-            'user_id' => $guru->id,
-            'room_id' => $room->id,
-            'title' => 'Agenda Jadwal Lama 4 Hari Lalu',
-            'event_date' => Carbon::today()->subDays(4)->toDateString(),
-            'start_time' => '08:00:00',
-            'end_time' => '10:00:00',
-            'status' => 'Disetujui',
-            'approved_by' => $admin->id,
-        ]);
-        $this->assertSame('Sudah Terlaksana', $eventExpired->execution_status);
-        $this->assertTrue($eventExpired->isCompletedExpired(48));
+        $this->assertSame('Sudah Terlaksana', $eventExpiredYesterday->execution_status);
+        $this->assertTrue($eventExpiredYesterday->isCompletedExpired());
 
         // 4. Ditolak -> 'Ditolak'
         $eventRejected = Event::create([
@@ -103,15 +115,27 @@ class EventExecutionStatusTest extends TestCase
         ]);
         $this->assertSame('Menunggu Persetujuan', $eventPending->execution_status);
 
-        // Cek Tampilan Halaman Pengajuan Ruangan (events.index)
-        $this->actingAs($admin)
-            ->get(route('events.index'))
-            ->assertOk()
-            ->assertSee('Sedang Berlangsung')
+        // Cek Tampilan Halaman Pengajuan Ruangan (events.index) & Pengurutan
+        $response = $this->actingAs($admin)->get(route('events.index'))->assertOk();
+        $response->assertSee('Sedang Berlangsung')
             ->assertSee('Belum Terlaksana')
             ->assertSee('Sudah Terlaksana')
             ->assertSee('Ditolak')
-            ->assertSee('Menunggu Persetujuan');
+            ->assertSee('Menunggu Persetujuan')
+            ->assertSee('Rapat Pagi Tadi')
+            ->assertDontSee('Agenda Kemarin Sudah Lewat');
+
+        // Verifikasi Urutan: Hari ini paling teratas -> Menuju tanggal terdekat yang akan datang (Besok -> Lusa)
+        $html = $response->getContent();
+        $posToday = strpos($html, 'Workshop Coding Live');
+        $posTomorrow = strpos($html, 'Seminar Besok');
+        $posLusa = strpos($html, 'Lomba Lusa');
+
+        $this->assertNotFalse($posToday, 'Agenda hari ini harus muncul');
+        $this->assertNotFalse($posTomorrow, 'Agenda besok harus muncul');
+        $this->assertNotFalse($posLusa, 'Agenda lusa harus muncul');
+        $this->assertTrue($posToday < $posTomorrow, 'Agenda hari ini harus berada di atas agenda besok');
+        $this->assertTrue($posTomorrow < $posLusa, 'Agenda besok harus berada di atas agenda lusa');
 
         // Cek Filter 'menunggu_persetujuan'
         $this->actingAs($admin)
@@ -119,7 +143,7 @@ class EventExecutionStatusTest extends TestCase
             ->assertOk()
             ->assertSee('Pengajuan Baru Menunggu')
             ->assertDontSee('Workshop Coding Live')
-            ->assertDontSee('Seminar Pendidikan Masa Depan');
+            ->assertDontSee('Seminar Besok');
 
         // Cek Filter alias 'pending'
         $this->actingAs($admin)
@@ -132,30 +156,31 @@ class EventExecutionStatusTest extends TestCase
             ->get(route('events.index', ['status' => 'sedang_berlangsung']))
             ->assertOk()
             ->assertSee('Workshop Coding Live')
-            ->assertDontSee('Seminar Pendidikan Masa Depan')
-            ->assertDontSee('Rapat Kemarin');
+            ->assertDontSee('Seminar Besok')
+            ->assertDontSee('Rapat Pagi Tadi');
 
         // Cek Filter 'belum_terlaksana'
         $this->actingAs($admin)
             ->get(route('events.index', ['status' => 'belum_terlaksana']))
             ->assertOk()
-            ->assertSee('Seminar Pendidikan Masa Depan')
+            ->assertSee('Seminar Besok')
+            ->assertSee('Lomba Lusa')
             ->assertDontSee('Workshop Coding Live')
-            ->assertDontSee('Rapat Kemarin');
+            ->assertDontSee('Rapat Pagi Tadi');
 
-        // Cek Filter 'sudah_terlaksana'
+        // Cek Filter 'sudah_terlaksana' (hanya menampilkan yang hari ini, yang kemarin otomatis hilang setelah 23:59)
         $this->actingAs($admin)
             ->get(route('events.index', ['status' => 'sudah_terlaksana']))
             ->assertOk()
-            ->assertSee('Rapat Kemarin')
-            ->assertDontSee('Agenda Jadwal Lama 4 Hari Lalu')
+            ->assertSee('Rapat Pagi Tadi')
+            ->assertDontSee('Agenda Kemarin Sudah Lewat')
             ->assertDontSee('Workshop Coding Live')
-            ->assertDontSee('Seminar Pendidikan Masa Depan');
+            ->assertDontSee('Seminar Besok');
 
-        // Pastikan agenda lama tetap ada di Database dan Menu Laporan Admin
+        // Pastikan agenda kemarin tetap ada di Database dan Menu Laporan Admin
         $this->assertDatabaseHas('events', [
-            'id' => $eventExpired->id,
-            'title' => 'Agenda Jadwal Lama 4 Hari Lalu',
+            'id' => $eventExpiredYesterday->id,
+            'title' => 'Agenda Kemarin Sudah Lewat',
         ]);
 
         $this->actingAs($admin)
@@ -164,7 +189,7 @@ class EventExecutionStatusTest extends TestCase
                 'tanggal' => Carbon::today()->toDateString(),
             ]))
             ->assertOk()
-            ->assertSee('Agenda Jadwal Lama 4 Hari Lalu');
+            ->assertSee('Agenda Kemarin Sudah Lewat');
     }
 
     private function userWithRole(string $roleName): User

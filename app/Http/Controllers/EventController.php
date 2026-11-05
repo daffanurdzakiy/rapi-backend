@@ -24,7 +24,14 @@ class EventController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $query = Event::with(['room', 'user', 'approver'])->latest('event_date')->latest('start_time');
+        $today = now('Asia/Jakarta')->toDateString();
+
+        // Urutkan dari hari ini yang paling teratas dan semakin ke bawah menuju tanggal terdekat yang akan datang
+        $query = Event::with(['room', 'user', 'approver'])
+            ->orderByRaw('CASE WHEN event_date >= ? THEN 0 ELSE 1 END', [$today])
+            ->orderBy('event_date', 'asc')
+            ->orderBy('start_time', 'asc');
+
         $role = $user->role?->role_name;
         if ($role === 'PIC') {
             $query->whereHas('room', fn ($q) => $q->where('pic_id', $user->id));
@@ -35,11 +42,11 @@ class EventController extends Controller
         $rawEvents = $query->get();
 
         // Pada tampilan Jadwal Ruangan / Manajemen Agenda:
-        // Agenda yang sudah terlaksana hanya ditampilkan dalam kurun waktu 2 hari (48 jam) setelah selesai.
-        // Setelah melewati 2 hari, kartu agenda tersebut otomatis hilang dari tampilan ini,
-        // namun data di database dan menu laporan rekap tetap tersimpan utuh.
+        // Agenda yang sudah terlaksana hari ini tetap tampil hingga pukul 23:59,
+        // dan otomatis hilang setelah ganti hari (setelah jam 23:59).
+        // Seluruh data di database dan menu laporan rekap tetap tersimpan utuh.
         $allEvents = $rawEvents->reject(function ($event) {
-            return $event->isCompletedExpired(48);
+            return $event->isCompletedExpired();
         })->values();
 
         // Menghitung jumlah per status (otomatis berdasarkan waktu pelaksanaan agenda)

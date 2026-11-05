@@ -115,11 +115,12 @@ class Event extends Model
     }
 
     /**
-     * Mengecek apakah agenda yang sudah terlaksana telah melewati batas retensi tampilan (2 hari / 48 jam).
-     * Jika sudah lewat lebih dari 2 hari sejak waktu selesai, agenda otomatis disembunyikan
-     * dari menu utama Jadwal Ruangan / Manajemen Agenda (data di database dan laporan tetap tersimpan utuh).
+     * Mengecek apakah agenda yang sudah terlaksana telah melewati hari pelaksanaan (hilang setelah jam 23:59 / ganti hari).
+     * Jika agenda sudah selesai dan hari sudah berganti (event_date < today),
+     * agenda otomatis tidak ditampilkan di menu Jadwal Ruangan / Manajemen Agenda.
+     * Data di database dan menu laporan rekap tetap tersimpan utuh.
      */
-    public function isCompletedExpired(int $hours = 48): bool
+    public function isCompletedExpired(?int $hours = null): bool
     {
         if ($this->execution_status !== 'Sudah Terlaksana') {
             return false;
@@ -130,15 +131,10 @@ class Event extends Model
                 ? $this->event_date->format('Y-m-d')
                 : substr((string) $this->event_date, 0, 10);
 
-            $endTime = substr((string) $this->end_time, 0, 8);
-            if (strlen($endTime) === 5) {
-                $endTime .= ':00';
-            }
+            $todayStr = now('Asia/Jakarta')->format('Y-m-d');
 
-            $endDateTime = Carbon::parse("{$dateStr} {$endTime}", 'Asia/Jakarta');
-            $cutoff = now('Asia/Jakarta')->subHours($hours);
-
-            return $endDateTime->lt($cutoff);
+            // Agenda yang sudah selesai hari ini akan hilang setelah ganti hari (lewat jam 23:59 / tanggal sebelum hari ini)
+            return $dateStr < $todayStr;
         } catch (\Throwable $e) {
             return false;
         }
