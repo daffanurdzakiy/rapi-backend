@@ -139,4 +139,37 @@ class Event extends Model
             return false;
         }
     }
+
+    /**
+     * Mengecek apakah pengajuan agenda yang ditolak telah melewati batas retensi tampilan (24 jam sejak ditolak).
+     * Setelah melewati 24 jam sejak penolakan, pengajuan otomatis tidak ditampilkan
+     * pada menu Jadwal Ruangan / Manajemen Agenda (data di database dan menu laporan tetap tersimpan utuh).
+     */
+    public function isRejectedExpired(int $hours = 24): bool
+    {
+        if ($this->status !== 'Ditolak') {
+            return false;
+        }
+
+        try {
+            $rejectedAt = $this->updated_at ?? $this->created_at;
+            if (!$rejectedAt) {
+                return false;
+            }
+
+            return $rejectedAt->lt(now('Asia/Jakarta')->subHours($hours));
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Mengecek apakah agenda sudah kedaluwarsa untuk ditampilkan di Jadwal Ruangan / Manajemen Agenda:
+     * - Agenda 'Sudah Terlaksana': hilang setelah ganti hari (setelah jam 23:59).
+     * - Agenda 'Ditolak': hilang setelah 24 jam sejak waktu penolakan.
+     */
+    public function isExpiredFromView(): bool
+    {
+        return $this->isCompletedExpired() || $this->isRejectedExpired(24);
+    }
 }

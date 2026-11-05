@@ -152,7 +152,8 @@
         Menunggu Persetujuan <span class="filter-count">{{ $counts['menunggu_persetujuan'] ?? 0 }}</span>
     </a>
     <a href="{{ route('events.index', ['status' => 'ditolak']) }}"
-       class="filter-tab {{ $current === 'ditolak' ? 'active' : '' }}">
+       class="filter-tab {{ $current === 'ditolak' ? 'active' : '' }}"
+       title="Pengajuan yang ditolak akan tampil selama 24 jam sebelum otomatis diarsipkan">
         Ditolak <span class="filter-count">{{ $counts['ditolak'] ?? 0 }}</span>
     </a>
 </div>

@@ -42,11 +42,11 @@ class EventController extends Controller
         $rawEvents = $query->get();
 
         // Pada tampilan Jadwal Ruangan / Manajemen Agenda:
-        // Agenda yang sudah terlaksana hari ini tetap tampil hingga pukul 23:59,
-        // dan otomatis hilang setelah ganti hari (setelah jam 23:59).
+        // - Agenda yang sudah terlaksana hari ini tetap tampil hingga pukul 23:59, dan hilang setelah ganti hari.
+        // - Pengajuan agenda yang ditolak akan hilang dari tampilan setelah kurun waktu 24 jam sejak ditolak.
         // Seluruh data di database dan menu laporan rekap tetap tersimpan utuh.
         $allEvents = $rawEvents->reject(function ($event) {
-            return $event->isCompletedExpired();
+            return $event->isExpiredFromView();
         })->values();
 
         // Menghitung jumlah per status (otomatis berdasarkan waktu pelaksanaan agenda)
