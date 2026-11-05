@@ -126,6 +126,9 @@
 <div class="events-filter-bar">
     @php
         $current = $currentFilter ?? 'semua';
+        if ($current === 'pending') {
+            $current = 'menunggu_persetujuan';
+        }
     @endphp
     <a href="{{ route('events.index', ['status' => 'semua']) }}"
        class="filter-tab {{ $current === 'semua' ? 'active' : '' }}">
@@ -133,23 +136,23 @@
     </a>
     <a href="{{ route('events.index', ['status' => 'sedang_berlangsung']) }}"
        class="filter-tab {{ $current === 'sedang_berlangsung' ? 'active' : '' }}">
-        ● Sedang Berlangsung <span class="filter-count">{{ $counts['sedang_berlangsung'] ?? 0 }}</span>
+        Sedang Berlangsung <span class="filter-count">{{ $counts['sedang_berlangsung'] ?? 0 }}</span>
     </a>
     <a href="{{ route('events.index', ['status' => 'belum_terlaksana']) }}"
        class="filter-tab {{ $current === 'belum_terlaksana' ? 'active' : '' }}">
-        🗓️ Belum Terlaksana <span class="filter-count">{{ $counts['belum_terlaksana'] ?? 0 }}</span>
+        Belum Terlaksana <span class="filter-count">{{ $counts['belum_terlaksana'] ?? 0 }}</span>
     </a>
     <a href="{{ route('events.index', ['status' => 'sudah_terlaksana']) }}"
        class="filter-tab {{ $current === 'sudah_terlaksana' ? 'active' : '' }}">
-        ✓ Sudah Terlaksana <span class="filter-count">{{ $counts['sudah_terlaksana'] ?? 0 }}</span>
+        Sudah Terlaksana <span class="filter-count">{{ $counts['sudah_terlaksana'] ?? 0 }}</span>
     </a>
-    <a href="{{ route('events.index', ['status' => 'pending']) }}"
-       class="filter-tab {{ $current === 'pending' ? 'active' : '' }}">
-        ⏳ Pending <span class="filter-count">{{ $counts['pending'] ?? 0 }}</span>
+    <a href="{{ route('events.index', ['status' => 'menunggu_persetujuan']) }}"
+       class="filter-tab {{ $current === 'menunggu_persetujuan' ? 'active' : '' }}">
+        Menunggu Persetujuan <span class="filter-count">{{ $counts['menunggu_persetujuan'] ?? 0 }}</span>
     </a>
     <a href="{{ route('events.index', ['status' => 'ditolak']) }}"
        class="filter-tab {{ $current === 'ditolak' ? 'active' : '' }}">
-        ✕ Ditolak <span class="filter-count">{{ $counts['ditolak'] ?? 0 }}</span>
+        Ditolak <span class="filter-count">{{ $counts['ditolak'] ?? 0 }}</span>
     </a>
 </div>
 
@@ -176,17 +179,7 @@
                 </div>
                 <div>
                     <span class="badge {{ $event->execution_status_badge_class }}" title="Status Persetujuan: {{ $event->status }}">
-                        @if($event->execution_status === 'Sedang Berlangsung')
-                            <span class="pulse-dot"></span> Sedang Berlangsung
-                        @elseif($event->execution_status === 'Belum Terlaksana')
-                            🗓️ Belum Terlaksana
-                        @elseif($event->execution_status === 'Sudah Terlaksana')
-                            ✓ Sudah Terlaksana
-                        @elseif($event->execution_status === 'Ditolak')
-                            ✕ Ditolak
-                        @else
-                            ⏳ Pending
-                        @endif
+                        {{ $event->execution_status }}
                     </span>
                 </div>
             </div>
@@ -227,7 +220,7 @@
         <div style="text-align:center; padding:32px 16px;">
             <p class="muted" style="margin:0; font-size:14px;">
                 @if(($currentFilter ?? 'semua') !== 'semua')
-                    Tidak ada agenda dengan status <b>{{ $currentFilter === 'sedang_berlangsung' ? 'Sedang Berlangsung' : ($currentFilter === 'belum_terlaksana' ? 'Belum Terlaksana' : ($currentFilter === 'sudah_terlaksana' ? 'Sudah Terlaksana' : ($currentFilter === 'pending' ? 'Pending' : 'Ditolak'))) }}</b>.
+                    Tidak ada agenda dengan status <b>{{ $currentFilter === 'sedang_berlangsung' ? 'Sedang Berlangsung' : ($currentFilter === 'belum_terlaksana' ? 'Belum Terlaksana' : ($currentFilter === 'sudah_terlaksana' ? 'Sudah Terlaksana' : ($currentFilter === 'menunggu_persetujuan' || $currentFilter === 'pending' ? 'Menunggu Persetujuan' : 'Ditolak'))) }}</b>.
                 @else
                     Belum ada agenda peminjaman ruangan.
                 @endif

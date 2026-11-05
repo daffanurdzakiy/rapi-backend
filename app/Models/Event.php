@@ -56,13 +56,16 @@ class Event extends Model
      *   - Sedang berlangsung hari ini (di antara start_time & end_time) -> 'Sedang Berlangsung'
      *   - Jam selesai sudah lewat -> 'Sudah Terlaksana'
      * - Jika 'Ditolak' -> 'Ditolak'
-     * - Jika 'Pending' -> 'Pending'
+     * - Jika 'Pending' -> 'Menunggu Persetujuan'
      * - Status lainnya (misal 'Dipindahkan') -> tetap sesuai status aslinya.
      */
     public function getExecutionStatusAttribute(): string
     {
         if ($this->status !== 'Disetujui') {
-            return $this->status ?? 'Pending';
+            if ($this->status === 'Pending') {
+                return 'Menunggu Persetujuan';
+            }
+            return $this->status ?? 'Menunggu Persetujuan';
         }
 
         try {
@@ -106,7 +109,7 @@ class Event extends Model
             'Belum Terlaksana' => 'badge-upcoming',
             'Sudah Terlaksana' => 'badge-completed',
             'Ditolak' => 'badge-rejected',
-            'Pending' => 'badge-pending',
+            'Menunggu Persetujuan', 'Pending' => 'badge-pending',
             default => '',
         };
     }

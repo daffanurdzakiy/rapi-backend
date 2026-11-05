@@ -40,7 +40,8 @@ class EventController extends Controller
             'sedang_berlangsung' => $allEvents->where('execution_status', 'Sedang Berlangsung')->count(),
             'belum_terlaksana' => $allEvents->where('execution_status', 'Belum Terlaksana')->count(),
             'sudah_terlaksana' => $allEvents->where('execution_status', 'Sudah Terlaksana')->count(),
-            'pending' => $allEvents->where('status', 'Pending')->count(),
+            'menunggu_persetujuan' => $allEvents->filter(fn ($item) => in_array($item->execution_status, ['Menunggu Persetujuan', 'Pending']))->count(),
+            'pending' => $allEvents->filter(fn ($item) => in_array($item->execution_status, ['Menunggu Persetujuan', 'Pending']))->count(),
             'ditolak' => $allEvents->where('status', 'Ditolak')->count(),
         ];
 
@@ -49,15 +50,19 @@ class EventController extends Controller
             'sedang_berlangsung' => 'Sedang Berlangsung',
             'belum_terlaksana' => 'Belum Terlaksana',
             'sudah_terlaksana' => 'Sudah Terlaksana',
-            'pending' => 'Pending',
+            'menunggu_persetujuan' => 'Menunggu Persetujuan',
+            'pending' => 'Menunggu Persetujuan',
             'ditolak' => 'Ditolak',
         ];
 
         if (isset($statusFilterMap[$filter])) {
             $target = $statusFilterMap[$filter];
             $events = $allEvents->filter(function ($item) use ($target) {
-                if ($target === 'Pending' || $target === 'Ditolak') {
-                    return $item->status === $target;
+                if ($target === 'Menunggu Persetujuan') {
+                    return $item->execution_status === 'Menunggu Persetujuan' || $item->status === 'Pending';
+                }
+                if ($target === 'Ditolak') {
+                    return $item->status === 'Ditolak';
                 }
                 return $item->execution_status === $target;
             })->values();

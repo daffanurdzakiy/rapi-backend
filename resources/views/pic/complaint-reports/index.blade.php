@@ -93,7 +93,7 @@
                             <div>{{ $complaint->description }}</div>
                             @if($complaint->repair_note)
                                 <div style="margin-top:4px; font-size:11.5px; color:#166534; font-weight:600;">
-                                    ✓ Keterangan Perbaikan: {{ $complaint->repair_note }}
+                                    Keterangan Perbaikan: {{ $complaint->repair_note }}
                                 </div>
                             @endif
                         </td>

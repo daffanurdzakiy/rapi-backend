@@ -76,7 +76,7 @@ class EventExecutionStatusTest extends TestCase
         ]);
         $this->assertSame('Ditolak', $eventRejected->execution_status);
 
-        // 5. Pending -> 'Pending'
+        // 5. Pending -> 'Menunggu Persetujuan'
         $eventPending = Event::create([
             'user_id' => $guru->id,
             'room_id' => $room->id,
@@ -86,7 +86,7 @@ class EventExecutionStatusTest extends TestCase
             'end_time' => '15:00:00',
             'status' => 'Pending',
         ]);
-        $this->assertSame('Pending', $eventPending->execution_status);
+        $this->assertSame('Menunggu Persetujuan', $eventPending->execution_status);
 
         // Cek Tampilan Halaman Pengajuan Ruangan (events.index)
         $this->actingAs($admin)
@@ -96,7 +96,21 @@ class EventExecutionStatusTest extends TestCase
             ->assertSee('Belum Terlaksana')
             ->assertSee('Sudah Terlaksana')
             ->assertSee('Ditolak')
-            ->assertSee('Pending');
+            ->assertSee('Menunggu Persetujuan');
+
+        // Cek Filter 'menunggu_persetujuan'
+        $this->actingAs($admin)
+            ->get(route('events.index', ['status' => 'menunggu_persetujuan']))
+            ->assertOk()
+            ->assertSee('Pengajuan Baru Menunggu')
+            ->assertDontSee('Workshop Coding Live')
+            ->assertDontSee('Seminar Pendidikan Masa Depan');
+
+        // Cek Filter alias 'pending'
+        $this->actingAs($admin)
+            ->get(route('events.index', ['status' => 'pending']))
+            ->assertOk()
+            ->assertSee('Pengajuan Baru Menunggu');
 
         // Cek Filter 'sedang_berlangsung'
         $this->actingAs($admin)
@@ -135,3 +149,4 @@ class EventExecutionStatusTest extends TestCase
         return User::factory()->create(['role_id' => $roleId]);
     }
 }
+

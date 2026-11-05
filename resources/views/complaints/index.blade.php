@@ -117,7 +117,7 @@
                         @if($complaint->repair_note)
                             <div style="margin-top:10px; padding:10px 14px; border-radius:8px; background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; font-size:13px; line-height:1.5;">
                                 <div style="font-weight:700; display:flex; align-items:center; gap:6px; margin-bottom:3px;">
-                                    <span>✅</span> Keterangan Sudah Diperbaiki:
+                                    Keterangan Sudah Diperbaiki:
                                 </div>
                                 <div style="color:#14532d; white-space:pre-wrap;">{{ $complaint->repair_note }}</div>
                             </div>
@@ -132,17 +132,11 @@
                             };
                         @endphp
                         <span class="badge {{ $badgeClass }}">
-                            @if($complaint->status_repair === 'Sudah Diperbaiki')
-                                ✓ Sudah Diperbaiki
-                            @elseif($complaint->status_repair === 'Menunggu Spare Part')
-                                ⏳ Menunggu Spare Part
-                            @else
-                                ⚠️ Belum Diperbaiki
-                            @endif
+                            {{ $complaint->status_repair }}
                         </span>
                         @if($complaint->status_repair === 'Sudah Diperbaiki')
                             <span style="display:inline-block; margin-top:4px; font-size:11px; color:#15803d; font-weight:600;">
-                                ⏱️ Tampil 24 jam (diperbaiki {{ $complaint->updated_at->diffForHumans() }})
+                                Tampil 24 jam (diperbaiki {{ $complaint->updated_at->diffForHumans() }})
                             </span>
                         @endif
                         @if($complaint->photo_path)
