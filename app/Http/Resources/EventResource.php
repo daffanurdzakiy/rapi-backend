@@ -34,6 +34,7 @@ class EventResource extends JsonResource
             'status' => $this->status,
             'execution_status' => $this->execution_status,
             'status_label' => $this->execution_status,
+            'calendar_color_type' => $this->calendar_color_type,
             // Catatan alasan pemindahan jadwal (jika pernah dipindah oleh Admin) atau alasan penolakan dari PIC/Admin
             'move_reason' => $this->move_reason,
             'rejection_reason' => $this->rejection_reason,

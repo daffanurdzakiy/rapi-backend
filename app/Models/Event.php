@@ -172,4 +172,25 @@ class Event extends Model
     {
         return $this->isCompletedExpired() || $this->isRejectedExpired(24);
     }
+
+    /**
+     * Warna peminjaman ruangan di kalender umum:
+     * - Admin -> kuning ('admin')
+     * - Guru & Organisasi -> hijau ('applicant')
+     */
+    public function getCalendarColorTypeAttribute(): string
+    {
+        $roleName = $this->user?->role?->role_name;
+
+        if ($roleName === 'Admin') {
+            return 'admin';
+        }
+
+        return 'applicant'; // Guru & Organisasi
+    }
+
+    public function getCalendarBadgeClassAttribute(): string
+    {
+        return $this->calendar_color_type === 'admin' ? 'chip-admin' : 'chip-applicant';
+    }
 }

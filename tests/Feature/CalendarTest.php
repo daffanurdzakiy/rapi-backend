@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Event;
 use App\Models\Room;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -54,10 +55,73 @@ class CalendarTest extends TestCase
             ->assertSee('Agenda Ketiga')
             ->assertSee('+1 lainnya')
             ->assertSee('id="agenda-'.str_replace('-', '', $date).'"', false)
-            ->assertDontSee('Agenda Belum Disetujui');
+            ->assertDontSee('Agenda Belum Disetujui')
+            ->assertSee('chip-applicant');
 
-        $this->assertSame(2, substr_count($response->getContent(), 'class="agenda-chip"'));
-        $this->assertSame(3, substr_count($response->getContent(), 'class="dialog-event"'));
+        $this->assertStringContainsString('agenda-chip chip-applicant', $response->getContent());
+        $this->assertStringContainsString('dialog-event chip-applicant', $response->getContent());
+    }
+
+    public function test_calendar_color_coding_for_roles_and_holidays_and_weekends(): void
+    {
+        $room = $this->room('Ruang Teater');
+        $date = Carbon::parse('2026-05-15'); // Hari Jumat
+
+        // 1. Peminjaman oleh Guru -> chip-applicant (Hijau)
+        $eventGuru = Event::create([
+            'user_id' => $this->userWithRole('Guru')->id,
+            'room_id' => $room->id,
+            'title' => 'Workshop Guru',
+            'event_date' => $date->toDateString(),
+            'start_time' => '08:00',
+            'end_time' => '10:00',
+            'status' => 'Disetujui',
+        ]);
+        $this->assertSame('applicant', $eventGuru->calendar_color_type);
+        $this->assertSame('chip-applicant', $eventGuru->calendar_badge_class);
+
+        // 2. Peminjaman oleh Organisasi -> chip-applicant (Hijau)
+        $eventOrg = Event::create([
+            'user_id' => $this->userWithRole('Organisasi')->id,
+            'room_id' => $room->id,
+            'title' => 'Rapat OSIS',
+            'event_date' => $date->toDateString(),
+            'start_time' => '10:00',
+            'end_time' => '12:00',
+            'status' => 'Disetujui',
+        ]);
+        $this->assertSame('applicant', $eventOrg->calendar_color_type);
+        $this->assertSame('chip-applicant', $eventOrg->calendar_badge_class);
+
+        // 3. Peminjaman oleh Admin -> chip-admin (Kuning)
+        $eventAdmin = Event::create([
+            'user_id' => $this->userWithRole('Admin')->id,
+            'room_id' => $room->id,
+            'title' => 'Rapat Pleno Admin',
+            'event_date' => $date->toDateString(),
+            'start_time' => '13:00',
+            'end_time' => '15:00',
+            'status' => 'Disetujui',
+        ]);
+        $this->assertSame('admin', $eventAdmin->calendar_color_type);
+        $this->assertSame('chip-admin', $eventAdmin->calendar_badge_class);
+
+        // 4. Request halaman kalender bulan Mei 2026 (terdapat libur nasional 1 Mei Hari Buruh & 14 Mei Kenaikan Yesus)
+        $response = $this->get(route('calendar.public', ['month' => '2026-05']))
+            ->assertOk()
+            ->assertSee('Guru &amp; Organisasi (Hijau)', false)
+            ->assertSee('Admin (Kuning)')
+            ->assertSee('Libur Nasional (Merah)')
+            ->assertSee('chip-applicant')
+            ->assertSee('chip-admin')
+            ->assertSee('chip-holiday')
+            ->assertSee('Hari Buruh Internasional')
+            ->assertSee('calendar-day weekend', false);
+
+        // Pastikan kolom weekend (Sabtu & Minggu) teridentifikasi
+        $html = $response->getContent();
+        $this->assertStringContainsString('weekend-header', $html);
+        $this->assertStringContainsString('weekend', $html);
     }
 
     public function test_signed_in_calendar_uses_the_same_month_view(): void

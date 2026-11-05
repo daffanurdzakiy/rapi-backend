@@ -38,7 +38,7 @@
         background: linear-gradient(145deg, #fff 0%, #fff 65%, #fbfcff 100%);
         box-shadow: 0 14px 34px rgba(32, 52, 103, .09), 0 2px 7px rgba(32, 52, 103, .04);
     }
-    .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+    .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
     .month-title { margin: 0; color: #27366d; font-family: Georgia, serif; font-size: 24px; font-weight: 500; }
     .month-title span { color: #8190b7; }
     .calendar-controls { display: flex; align-items: center; gap: 9px; }
@@ -88,19 +88,20 @@
         overflow: hidden;
         margin-top: 4px;
         padding: 5px 6px;
-        border-left: 2px solid #315cff;
-        border-radius: 5px;
-        background: linear-gradient(105deg, #edf2ff, #f2f5ff);
+        border-left: 3px solid #315cff;
+        border-radius: 6px;
+        background: #edf2ff;
         color: #293965;
         text-decoration: none;
+        cursor: pointer;
         transition: transform .16s, background .16s, box-shadow .16s;
     }
-    .agenda-chip:hover { transform: translateX(2px); background: #e5edff; box-shadow: 0 3px 8px #315cff19; }
-    .agenda-time { display: block; overflow: hidden; color: #315cff; font-size: 9px; font-weight: 800; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
-    .agenda-caption { display: block; overflow: hidden; color: #39496f; font-size: 9px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+    .agenda-chip:hover { transform: translateX(2px); box-shadow: 0 3px 8px rgba(33, 56, 116, .12); }
+    .agenda-time { display: block; overflow: hidden; font-size: 9px; font-weight: 800; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+    .agenda-caption { display: block; overflow: hidden; font-size: 9px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
     .calendar-more { margin: 4px 0 0 3px; padding: 1px 0; border: 0; background: transparent; color: #7181a8; cursor: pointer; font: inherit; font-size: 9px; text-align: left; }
     .calendar-more:hover { color: #315cff; text-decoration: underline; }
-    .agenda-dialog { width: min(440px, calc(100% - 32px)); max-height: min(82vh, 620px); overflow: auto; padding: 26px 28px 20px; border: 0; border-radius: 20px; background: #fff; color: #202d5b; box-shadow: 0 24px 80px rgba(25, 39, 85, .25); }
+    .agenda-dialog { width: min(460px, calc(100% - 32px)); max-height: min(82vh, 620px); overflow: auto; padding: 26px 28px 20px; border: 0; border-radius: 20px; background: #fff; color: #202d5b; box-shadow: 0 24px 80px rgba(25, 39, 85, .25); }
     .agenda-dialog::backdrop { background: rgba(42, 57, 101, .34); backdrop-filter: blur(4px); }
     .dialog-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding-bottom: 17px; border-bottom: 1px solid #e5eaf5; }
     .dialog-heading h2 { margin: 0; color: #27366d; font-family: Georgia, serif; font-size: 22px; font-weight: 500; }
@@ -114,61 +115,10 @@
     .dialog-event-end { display: block; margin-top: 2px; color: #8190b3; font-size: 12px; font-weight: 400; }
     .dialog-event-title { color: #283766; font-size: 14px; font-weight: 700; }
     .dialog-event-room { margin-top: 5px; color: #7a89ad; font-size: 13px; }
-    .public-calendar { color: #e5eaff; background: #0b1028; }
-    .public-topbar { border-bottom-color: #293568; background: #151d49; box-shadow: 0 8px 24px rgba(3, 7, 24, .3); }
-    .public-brand { color: #f4f6ff; }
-    .public-brand:hover { color: #fff; }
-    .login-link { background: #6388ff; color: #091438; }
-    .login-link:hover { background: #7898ff; color: #081231; }
-    .calendar-page { color: #e5eaff; }
-    .calendar-page-heading h1 { color: #e5eaff; }
-    .calendar-page-heading p, .approved-count { color: #93a2ce; }
-    .approved-count strong { color: #83a3ff; }
-    .calendar-card { border-color: #29366f; background: linear-gradient(145deg, #171f4b, #141c43); box-shadow: 0 14px 34px rgba(3, 7, 24, .24), 0 2px 7px rgba(3, 7, 24, .12); }
-    .month-title, .dialog-heading h2 { color: #e5eaff; }
-    .month-title span { color: #93a2ce; }
-    .calendar-control { border-color: #354477; background: #10183b; color: #dce4ff; }
-    .calendar-control:hover { border-color: #718cff; background: #202b5a; color: #fff; }
-    .calendar-control.today { color: #a9beff; }
-    .calendar-scroll { border-color: #344477; background: #11183a; box-shadow: 0 4px 12px rgba(3, 7, 24, .15); }
-    .calendar-weekdays { background: #202957; }
-    .calendar-weekdays span { border-right-color: #344477; color: #aab7dc; }
-    .calendar-weekdays span:nth-last-child(-n+2) { color: #ff999e; }
-    .calendar-day { border-color: #344477; background: #151d45; }
-    .calendar-day:hover { background: #1b2556; box-shadow: inset 0 0 0 1px #637fdb; }
-    .calendar-day.outside-month { background: #101735; }
-    .calendar-day.outside-month .day-number { color: #62709b; }
-    .calendar-day.today { background: linear-gradient(145deg, #202d65, #171f4b); }
-    .day-number { color: #e5eaff; }
-    .today .day-number { background: #6388ff; color: #091438; box-shadow: 0 3px 8px rgba(99, 136, 255, .3); }
-    .agenda-chip { border-left-color: #7192ff; background: linear-gradient(105deg, #26366f, #202d5d); color: #e5eaff; }
-    .agenda-chip:hover { background: #30427f; box-shadow: 0 3px 8px rgba(3, 7, 24, .2); }
-    .agenda-time { color: #9cb5ff; }
-    .agenda-caption { color: #d4ddff; }
-    .calendar-more { color: #a8b8e3; }
-    .calendar-more:hover { color: #c5d2ff; }
-    .agenda-dialog { border: 1px solid #354477; background: #171f4b; color: #e5eaff; box-shadow: 0 24px 80px rgba(3, 7, 24, .55); }
-    .agenda-dialog::backdrop { background: rgba(4, 8, 28, .68); }
-    .dialog-heading { border-bottom-color: #354477; }
-    .dialog-heading p, .dialog-event-room { color: #93a2ce; }
-    .dialog-close { background: #26366f; color: #b6c8ff; }
-    .dialog-close:hover { background: #314782; }
-    .dialog-event { border-bottom-color: #354477; }
-    .dialog-event-time { color: #9cb5ff; }
-    .dialog-event-end { color: #93a2ce; }
-    .dialog-event-title { color: #e5eaff; }
-    @media (max-width: 760px) {
-        .public-topbar { padding: 0 20px; }
-        .public-wrap { width: min(100% - 28px, 1200px); padding-top: 25px; }
-        .calendar-page-heading { align-items: start; flex-direction: column; margin-bottom: 18px; }
-        .approved-count { padding: 0; }
-        .calendar-card { padding: 15px; border-radius: 16px; }
-        .calendar-toolbar { align-items: start; flex-direction: column; gap: 12px; margin-bottom: 15px; }
-        .month-title { font-size: 22px; }
-        .calendar-controls { align-self: end; margin-top: -47px; }
-        .calendar-day { min-height: 96px; padding: 6px; }
-        .agenda-dialog { padding: 22px 20px 16px; }
-    }
+
+    /* =========================================================================
+       TEMA WARNA RESMI (LIGHT THEME UTAMA APLIKASI)
+       ========================================================================= */
     :root { color-scheme: light; color: #26364a; background: #f7f4eb; }
     .public-calendar, .calendar-page { color: #26364a; background: #f7f4eb; }
     .public-topbar { border-top-color: #35465e; border-bottom-color: #e8e1d3; background: #fffdf8; box-shadow: 0 8px 22px rgba(38, 54, 74, .08); }
@@ -185,22 +135,194 @@
     .calendar-scroll { border-color: #e8e1d3; background: #fffdf8; box-shadow: 0 4px 12px rgba(38, 54, 74, .04); }
     .calendar-weekdays { background: #f1f3f6; }
     .calendar-weekdays span { border-right-color: #e8e1d3; color: #667386; }
-    .calendar-weekdays span:nth-last-child(-n+2) { color: #667386; }
     .calendar-day { border-color: #e8e1d3; background: #fffdf8; }
-    .calendar-day:hover { background: #f7f4eb; box-shadow: inset 0 0 0 1px #bdc9da; }
-    .calendar-day.outside-month { background: #f7f4eb; }
+    .calendar-day:hover { background: #fbf9f2; box-shadow: inset 0 0 0 1px #bdc9da; }
+    .calendar-day.outside-month { background: #f6f3eb; }
     .calendar-day.outside-month .day-number { color: #8993a2; }
-    .calendar-day.today { background: #f1f3f6; }
+    .calendar-day.today { background: #eef3fb; }
     .day-number { color: #26364a; }
     .today .day-number { background: #35465e; color: #fffdf8; box-shadow: 0 3px 8px rgba(53, 70, 94, .18); }
-    .agenda-chip { border-left-color: #667b99; background: #f1f3f6; color: #26364a; }
-    .agenda-chip:hover { background: #e8edf4; box-shadow: 0 3px 8px rgba(38, 54, 74, .08); }
-    .agenda-caption, .dialog-event-title { color: #35465e; }
     .calendar-more { color: #667386; }
     .calendar-more:hover { color: #26364a; }
     .dialog-heading, .dialog-event { border-color: #e8e1d3; }
     .dialog-close { background: #f1f3f6; color: #35465e; }
     .dialog-close:hover { background: #e8edf4; }
+
+    /* =========================================================================
+       FITUR: PETUNJUK WARNA KALENDER (LEGEND BAR)
+       ========================================================================= */
+    .calendar-legend-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 16px;
+        padding: 9px 16px;
+        border: 1px solid #e8e1d3;
+        border-radius: 12px;
+        background: #fbf9f4;
+    }
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #35465e;
+    }
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+    .dot-green { background: #16a34a; box-shadow: 0 0 0 2px #bbf7d0; }
+    .dot-yellow { background: #d97706; box-shadow: 0 0 0 2px #fde68a; }
+    .dot-red { background: #dc2626; box-shadow: 0 0 0 2px #fecaca; }
+
+    /* =========================================================================
+       FITUR: WARNA KOLOM HARI SABTU & MINGGU (WEEKEND) SEDIKIT BERBEDA
+       ========================================================================= */
+    .calendar-weekdays span.weekend-header {
+        background: #e9eef7;
+        color: #b91c1c;
+        font-weight: 800;
+    }
+    .calendar-day.weekend {
+        background: #f7f3e8; /* Warna kolom akhir pekan berbeda lembut dan rapi */
+    }
+    .calendar-day.weekend:hover {
+        background: #f1ebd8;
+        box-shadow: inset 0 0 0 1px #bdc9da;
+    }
+    .calendar-day.weekend.outside-month {
+        background: #ede7da;
+    }
+    .calendar-day.weekend.today {
+        background: #e7eef9;
+    }
+
+    /* =========================================================================
+       FITUR: WARNA AGENDA GURU & ORGANISASI (HIJAU)
+       ========================================================================= */
+    .agenda-chip.chip-applicant {
+        border-left: 3px solid #16a34a !important;
+        background: #f0fdf4 !important;
+        color: #14532d !important;
+    }
+    .agenda-chip.chip-applicant:hover {
+        background: #dcfce7 !important;
+        box-shadow: 0 3px 8px rgba(22, 163, 74, 0.16) !important;
+    }
+    .agenda-chip.chip-applicant .agenda-time {
+        color: #15803d !important;
+        font-weight: 800;
+    }
+    .agenda-chip.chip-applicant .agenda-caption {
+        color: #166534 !important;
+        font-weight: 600;
+    }
+
+    /* =========================================================================
+       FITUR: WARNA AGENDA ADMIN (KUNING / AMBER)
+       ========================================================================= */
+    .agenda-chip.chip-admin {
+        border-left: 3px solid #d97706 !important;
+        background: #fffbeb !important;
+        color: #78350f !important;
+    }
+    .agenda-chip.chip-admin:hover {
+        background: #fef3c7 !important;
+        box-shadow: 0 3px 8px rgba(217, 119, 6, 0.16) !important;
+    }
+    .agenda-chip.chip-admin .agenda-time {
+        color: #b45309 !important;
+        font-weight: 800;
+    }
+    .agenda-chip.chip-admin .agenda-caption {
+        color: #92400e !important;
+        font-weight: 600;
+    }
+
+    /* =========================================================================
+       FITUR: KALENDER HARI LIBUR NASIONAL OTOMATIS (MERAH)
+       ========================================================================= */
+    .agenda-chip.chip-holiday {
+        border-left: 3px solid #dc2626 !important;
+        background: #fef2f2 !important;
+        color: #991b1b !important;
+    }
+    .agenda-chip.chip-holiday:hover {
+        background: #fee2e2 !important;
+        box-shadow: 0 3px 8px rgba(220, 38, 38, 0.16) !important;
+    }
+    .agenda-chip.chip-holiday .holiday-tag {
+        color: #dc2626 !important;
+        font-size: 8.5px !important;
+        font-weight: 800 !important;
+        letter-spacing: .04em;
+    }
+    .agenda-chip.chip-holiday .holiday-caption {
+        color: #991b1b !important;
+        font-weight: 700 !important;
+    }
+    .calendar-day.has-holiday .holiday-number {
+        color: #dc2626 !important;
+        font-weight: 800 !important;
+    }
+
+    /* =========================================================================
+       STYLING DIALOG DETAIL AGENDA & LIBUR
+       ========================================================================= */
+    .dialog-holiday-box {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+    }
+    .dialog-holiday-dot { font-size: 16px; line-height: 1; }
+    .dialog-holiday-tag { font-size: 10px; font-weight: 800; color: #dc2626; letter-spacing: .06em; margin-bottom: 2px; }
+    .dialog-holiday-name { font-size: 14px; font-weight: 700; color: #7f1d1d; }
+
+    .dialog-event.chip-applicant {
+        border-left: 3px solid #16a34a;
+        padding-left: 12px;
+    }
+    .dialog-event.chip-applicant .dialog-event-time { color: #16a34a !important; }
+
+    .dialog-event.chip-admin {
+        border-left: 3px solid #d97706;
+        padding-left: 12px;
+    }
+    .dialog-event.chip-admin .dialog-event-time { color: #d97706 !important; }
+
+    .role-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 99px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .role-pill.chip-applicant {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+    .role-pill.chip-admin {
+        background: #fef3c7;
+        color: #b45309;
+        border: 1px solid #fde68a;
+    }
+
+    /* =========================================================================
+       RESPONSIVITAS MOBILE
+       ========================================================================= */
     @media (max-width: 760px) {
         .public-wrap { width: calc(100% - 24px); padding-top: 20px; }
         .calendar-page-heading h1 { font-size: 24px; }
@@ -213,6 +335,11 @@
             justify-content: space-between;
             gap: 8px;
             margin-bottom: 12px;
+        }
+        .calendar-legend-bar {
+            gap: 10px;
+            padding: 7px 12px;
+            font-size: 11px;
         }
         .month-title { font-size: clamp(16px, 5vw, 19px); white-space: nowrap; }
         .calendar-controls { align-self: auto; gap: 5px; margin-top: 0; }
