@@ -2,7 +2,7 @@
 
 @section('content')
 <h1>Buat Pengaduan Fasilitas</h1>
-<p class="muted">Lampirkan foto bukti maksimal 5 MB (JPG, PNG, atau WebP).</p>
+<p class="muted">Lampirkan foto bukti (JPG, PNG, atau WebP). Foto kamera akan otomatis dikompres agar hemat penyimpanan.</p>
 
 <form id="complaint-form" class="card" method="post" action="{{ route('complaints.store') }}" enctype="multipart/form-data">
     @csrf
@@ -72,11 +72,81 @@
             cameraPanel.hidden = true;
         }
 
-        function setPhoto(file) {
+        function formatBytes(bytes) {
+            if (!bytes || bytes <= 0) return '0 B';
+            var k = 1024;
+            var sizes = ['B', 'KB', 'MB', 'GB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function compressImageFile(file, onComplete) {
+            if (!window.FileReader || !window.HTMLCanvasElement || !file.type.startsWith('image/')) {
+                onComplete(file, file.size, file.size);
+                return;
+            }
+
+            var reader = new FileReader();
+            reader.onerror = function () {
+                onComplete(file, file.size, file.size);
+            };
+            reader.onload = function (e) {
+                var img = new Image();
+                img.onerror = function () {
+                    onComplete(file, file.size, file.size);
+                };
+                img.onload = function () {
+                    try {
+                        var maxDim = 1200;
+                        var width = img.naturalWidth || img.width;
+                        var height = img.naturalHeight || img.height;
+                        var scale = Math.min(1, maxDim / width, maxDim / height);
+                        var targetWidth = Math.max(1, Math.round(width * scale));
+                        var targetHeight = Math.max(1, Math.round(height * scale));
+
+                        var canvas = document.createElement('canvas');
+                        canvas.width = targetWidth;
+                        canvas.height = targetHeight;
+                        var ctx = canvas.getContext('2d');
+
+                        // Latar putih untuk format PNG/WebP dengan transparansi
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, targetWidth, targetHeight);
+                        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+                        canvas.toBlob(function (blob) {
+                            if (!blob) {
+                                onComplete(file, file.size, file.size);
+                                return;
+                            }
+                            var baseName = file.name.replace(/\.[^/.]+$/, '');
+                            var compressedFile = new File([blob], baseName + '.jpg', { type: 'image/jpeg' });
+                            onComplete(compressedFile, file.size, blob.size);
+                        }, 'image/jpeg', 0.75);
+                    } catch (err) {
+                        onComplete(file, file.size, file.size);
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setPhoto(file, originalSize, compressedSize) {
             var transfer = new DataTransfer();
             transfer.items.add(file);
             photoInput.files = transfer.files;
-            photoStatus.textContent = 'Foto terpilih: ' + file.name;
+
+            if (originalSize && compressedSize && originalSize > compressedSize) {
+                var pct = Math.round(((originalSize - compressedSize) / originalSize) * 100);
+                photoStatus.innerHTML = 'Foto terpilih: <b>' + file.name + '</b> ' +
+                    '<span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#ecfdf5; color:#065f46; font-size:12px; font-weight:600;">' +
+                    '⚡ Otomatis dikompres: ' + formatBytes(originalSize) + ' → ' + formatBytes(compressedSize) + ' (hemat ' + pct + '%)' +
+                    '</span>';
+            } else {
+                photoStatus.textContent = 'Foto terpilih: ' + file.name + ' (' + formatBytes(file.size) + ')';
+            }
+
             if (previewUrl) {
                 URL.revokeObjectURL(previewUrl);
             }
@@ -92,7 +162,11 @@
         photoInput.addEventListener('change', function () {
             if (photoInput.files.length) {
                 stopCamera();
-                setPhoto(photoInput.files[0]);
+                var originalFile = photoInput.files[0];
+                photoStatus.innerHTML = '<span class="muted">Mengompres foto otomatis...</span>';
+                compressImageFile(originalFile, function (compressedFile, origSize, compSize) {
+                    setPhoto(compressedFile, origSize, compSize);
+                });
             }
         });
 
@@ -128,7 +202,8 @@
             }
 
             var canvas = document.createElement('canvas');
-            var scale = Math.min(1, 1600 / cameraPreview.videoWidth);
+            var maxDim = 1200;
+            var scale = Math.min(1, maxDim / cameraPreview.videoWidth, maxDim / cameraPreview.videoHeight);
             canvas.width = Math.round(cameraPreview.videoWidth * scale);
             canvas.height = Math.round(cameraPreview.videoHeight * scale);
             canvas.getContext('2d').drawImage(cameraPreview, 0, 0, canvas.width, canvas.height);
@@ -144,10 +219,11 @@
                     return;
                 }
 
-                setPhoto(new File([blob], 'foto-pengaduan.jpg', { type: 'image/jpeg' }));
+                var file = new File([blob], 'foto-kamera-' + Date.now() + '.jpg', { type: 'image/jpeg' });
+                setPhoto(file, blob.size, blob.size);
                 stopCamera();
                 cameraError.hidden = true;
-            }, 'image/jpeg', 0.85);
+            }, 'image/jpeg', 0.75);
         });
 
         document.getElementById('close-camera').addEventListener('click', stopCamera);

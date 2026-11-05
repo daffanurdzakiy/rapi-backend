@@ -6,6 +6,7 @@ use App\Http\Resources\ComplaintResource;
 use App\Models\Complaint;
 use App\Models\Notification;
 use App\Models\Room;
+use App\Services\ImageCompressionService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -411,58 +412,11 @@ class ComplaintController extends ApiController
     /**
      * Compress image evidence to JPEG when GD is available.
      */
-    // Fungsi helper privat untuk memperkecil resolusi (maksimal lebar 1600px) dan mengompres kualitas gambar ke JPEG (80%)
-    // Menggunakan ekstensi PHP GD agar ukuran file hemat penyimpanan dan cepat dimuat di aplikasi mobile
+    // Fungsi helper privat untuk memperkecil resolusi dan mengompres kualitas gambar ke JPEG secara otomatis
+    // Menggunakan ImageCompressionService agar ukuran file hemat penyimpanan dan cepat dimuat di aplikasi mobile
     private function storeCompressedPhoto(UploadedFile $photo): string
     {
-        // Jika ekstensi GD tidak aktif di server PHP, simpan file asli tanpa kompresi
-        if (! function_exists('imagecreatefromstring') || ! function_exists('imagejpeg')) {
-            return $this->storeOriginalPhoto($photo);
-        }
-
-        $dimensions = @getimagesize($photo->getRealPath());
-        if ($dimensions === false) {
-            return $this->storeOriginalPhoto($photo);
-        }
-
-        $image = @imagecreatefromstring((string) file_get_contents($photo->getRealPath()));
-        if ($image === false) {
-            return $this->storeOriginalPhoto($photo);
-        }
-
-        // Jika lebar gambar melebihi 1600 piksel, perkecil ukuran secara proporsional (aspect ratio terjaga)
-        $width = imagesx($image);
-        $height = imagesy($image);
-        $maxWidth = 1600;
-        if ($width > $maxWidth) {
-            $newHeight = (int) round($height * ($maxWidth / $width));
-            $resized = imagecreatetruecolor($maxWidth, $newHeight);
-            if ($resized === false) {
-                imagedestroy($image);
-                throw new RuntimeException('Foto tidak dapat diproses.');
-            }
-            imagecopyresampled($resized, $image, 0, 0, 0, 0, $maxWidth, $newHeight, $width, $height);
-            imagedestroy($image);
-            $image = $resized;
-        }
-
-        // Encode gambar menjadi format JPEG dengan kualitas 80%
-        ob_start();
-        $encoded = imagejpeg($image, null, 80);
-        $content = ob_get_clean();
-        imagedestroy($image);
-
-        if (! $encoded || ! is_string($content)) {
-            throw new RuntimeException('Foto tidak dapat diproses.');
-        }
-
-        // Buat nama file unik menggunakan UUID dan simpan ke disk 'public'
-        $path = 'complaints/'.Str::uuid().'.jpg';
-        if (! Storage::disk('public')->put($path, $content)) {
-            throw new RuntimeException('Foto gagal disimpan ke penyimpanan disk.');
-        }
-
-        return $path;
+        return app(ImageCompressionService::class)->compressAndStore($photo, 'complaints');
     }
 
     // Fungsi fallback untuk menyimpan file gambar asli apabila ekstensi GD tidak tersedia

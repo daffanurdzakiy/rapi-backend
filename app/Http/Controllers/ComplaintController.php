@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Complaint;
 use App\Models\Notification;
 use App\Models\Room;
+use App\Services\ImageCompressionService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -299,62 +300,10 @@ class ComplaintController extends Controller
     }
 
     /** Compress image evidence to JPEG when GD is available, then store it outside the public web root. */
-    // Fungsi bantu untuk mengompres ukuran dan resolusi foto menjadi JPEG (lebar maks 1600px, kualitas 80%) agar hemat penyimpanan.
+    // Fungsi bantu untuk mengompres ukuran dan resolusi foto secara otomatis agar hemat ruang penyimpanan.
     private function storeCompressedPhoto(UploadedFile $photo): string
     {
-        if (! function_exists('imagecreatefromstring') || ! function_exists('imagejpeg')) {
-            return $this->storeOriginalPhoto($photo);
-        }
-
-        $dimensions = @getimagesize($photo->getRealPath());
-        if ($dimensions === false) {
-            return $this->storeOriginalPhoto($photo);
-        }
-
-        $estimatedMemory = ($dimensions[0] * $dimensions[1] * 8)
-            + $photo->getSize()
-            + memory_get_usage(false)
-            + (8 * 1024 * 1024);
-        $memoryLimit = $this->memoryLimitInBytes();
-        if ($memoryLimit !== -1 && $estimatedMemory >= $memoryLimit) {
-            return $this->storeOriginalPhoto($photo);
-        }
-
-        $image = @imagecreatefromstring((string) file_get_contents($photo->getRealPath()));
-        if ($image === false) {
-            return $this->storeOriginalPhoto($photo);
-        }
-
-        $width = imagesx($image);
-        $height = imagesy($image);
-        $maxWidth = 1600;
-        if ($width > $maxWidth) {
-            $newHeight = (int) round($height * ($maxWidth / $width));
-            $resized = imagecreatetruecolor($maxWidth, $newHeight);
-            if ($resized === false) {
-                imagedestroy($image);
-                throw new RuntimeException('Foto tidak dapat diproses. Silakan coba gambar lain.');
-            }
-            imagecopyresampled($resized, $image, 0, 0, 0, 0, $maxWidth, $newHeight, $width, $height);
-            imagedestroy($image);
-            $image = $resized;
-        }
-
-        ob_start();
-        $encoded = imagejpeg($image, null, 80);
-        $content = ob_get_clean();
-        imagedestroy($image);
-
-        if (! $encoded || ! is_string($content)) {
-            throw new RuntimeException('Foto tidak dapat diproses. Silakan coba lagi.');
-        }
-
-        $path = 'complaints/'.Str::uuid().'.jpg';
-        if (! Storage::disk('public')->put($path, $content)) {
-            throw new RuntimeException('Foto gagal disimpan. Periksa ruang penyimpanan lalu coba lagi.');
-        }
-
-        return $path;
+        return app(ImageCompressionService::class)->compressAndStore($photo, 'complaints');
     }
 
     private function memoryLimitInBytes(): int
