@@ -89,7 +89,7 @@
                         <td>{{ $event->room->room_name }}</td>
                         <td>{{ $event->title }}</td>
                         <td>{{ $event->user->name }}</td>
-                        <td>{{ $event->status }}</td>
+                        <td>{{ $event->execution_status }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="muted">Tidak ada jadwal ruangan pada periode ini.</td></tr>

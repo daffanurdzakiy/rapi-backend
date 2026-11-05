@@ -123,7 +123,7 @@
 <div class="card">
     <h2>{{ $event->title }}</h2>
     <p class="muted">
-        {{ $event->event_date->format('d M Y') }} · Ruangan Saat Ini: <b>{{ $event->room->room_name }}</b> · Status: <b>{{ $event->status }}</b>
+        {{ $event->event_date->format('d M Y') }} · Ruangan Saat Ini: <b>{{ $event->room->room_name }}</b> · Status: <b>{{ $event->execution_status }}</b>
     </p>
 
     <form id="edit-event-form" method="post" action="{{ route('events.update', $event) }}">

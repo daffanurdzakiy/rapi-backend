@@ -153,6 +153,30 @@
         background: #f7f4eb;
         color: var(--dashboard-navy-deep);
     }
+    .dashboard-page .badge.badge-ongoing {
+        background: #ecfeff !important;
+        border-color: #67e8f9 !important;
+        color: #0e7490 !important;
+        font-weight: 700;
+    }
+    .dashboard-page .badge.badge-upcoming {
+        background: #f0fdf4 !important;
+        border-color: #86efac !important;
+        color: #166534 !important;
+        font-weight: 700;
+    }
+    .dashboard-page .badge.badge-completed {
+        background: #f1f5f9 !important;
+        border-color: #cbd5e1 !important;
+        color: #475569 !important;
+        font-weight: 600;
+    }
+    .dashboard-page .badge.badge-rejected {
+        background: #fef2f2 !important;
+        border-color: #fca5a5 !important;
+        color: #991b1b !important;
+        font-weight: 700;
+    }
     .dashboard-page .badge.bad {
         border-color: #cbd4e1;
         background: #e8edf4;
@@ -207,7 +231,7 @@
                         <strong class="room-schedule-title">{{ $roomEvent->title }}</strong>
                         <div class="room-schedule-meta">
                             <span>{{ substr($roomEvent->start_time, 0, 5) }}–{{ substr($roomEvent->end_time, 0, 5) }}</span>
-                            <span class="room-schedule-status {{ $roomEvent->status === 'Pending' ? 'pending' : '' }}">{{ $roomEvent->status }}</span>
+                            <span class="room-schedule-status {{ $roomEvent->status === 'Pending' ? 'pending' : '' }}">{{ $roomEvent->execution_status }}</span>
                         </div>
                     </div>
                 @endforeach
@@ -225,7 +249,7 @@
             <div class="list">
                 <b>{{ $event->title }}</b><br>
                 <span class="muted">{{ $event->room->room_name }} · {{ $event->event_date->locale('id')->translatedFormat('d M') }} {{ substr($event->start_time, 0, 5) }}–{{ substr($event->end_time, 0, 5) }}</span>
-                <span class="badge {{ $event->status === 'Pending' ? 'pending' : '' }}" style="float:right">{{ $event->status }}</span>
+                <span class="badge {{ $event->execution_status_badge_class }}" style="float:right">{{ $event->execution_status }}</span>
             </div>
         @empty
             <p class="muted">Belum ada agenda.</p>

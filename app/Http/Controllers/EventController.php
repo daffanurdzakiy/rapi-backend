@@ -24,15 +24,53 @@ class EventController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
-        $events = Event::with(['room', 'user', 'approver'])->latest('event_date');
+        $query = Event::with(['room', 'user', 'approver'])->latest('event_date')->latest('start_time');
         $role = $user->role?->role_name;
         if ($role === 'PIC') {
-            $events->whereHas('room', fn ($query) => $query->where('pic_id', $user->id));
+            $query->whereHas('room', fn ($q) => $q->where('pic_id', $user->id));
         } elseif ($role !== 'Admin') {
-            $events->where('user_id', $user->id);
+            $query->where('user_id', $user->id);
         }
 
-        return view('events.index', ['events' => $events->get()]);
+        $allEvents = $query->get();
+
+        // Menghitung jumlah per status (otomatis berdasarkan waktu pelaksanaan agenda)
+        $counts = [
+            'semua' => $allEvents->count(),
+            'sedang_berlangsung' => $allEvents->where('execution_status', 'Sedang Berlangsung')->count(),
+            'belum_terlaksana' => $allEvents->where('execution_status', 'Belum Terlaksana')->count(),
+            'sudah_terlaksana' => $allEvents->where('execution_status', 'Sudah Terlaksana')->count(),
+            'pending' => $allEvents->where('status', 'Pending')->count(),
+            'ditolak' => $allEvents->where('status', 'Ditolak')->count(),
+        ];
+
+        $filter = $request->query('status', 'semua');
+        $statusFilterMap = [
+            'sedang_berlangsung' => 'Sedang Berlangsung',
+            'belum_terlaksana' => 'Belum Terlaksana',
+            'sudah_terlaksana' => 'Sudah Terlaksana',
+            'pending' => 'Pending',
+            'ditolak' => 'Ditolak',
+        ];
+
+        if (isset($statusFilterMap[$filter])) {
+            $target = $statusFilterMap[$filter];
+            $events = $allEvents->filter(function ($item) use ($target) {
+                if ($target === 'Pending' || $target === 'Ditolak') {
+                    return $item->status === $target;
+                }
+                return $item->execution_status === $target;
+            })->values();
+        } else {
+            $events = $allEvents;
+            $filter = 'semua';
+        }
+
+        return view('events.index', [
+            'events' => $events,
+            'counts' => $counts,
+            'currentFilter' => $filter,
+        ]);
     }
 
     /** Display the room booking request form. */

@@ -32,6 +32,8 @@ class EventResource extends JsonResource
             'end_time' => substr($this->end_time, 0, 5),
             // Status pengajuan: 'Pending', 'Disetujui', atau 'Ditolak'
             'status' => $this->status,
+            'execution_status' => $this->execution_status,
+            'status_label' => $this->execution_status,
             // Catatan alasan pemindahan jadwal (jika pernah dipindah oleh Admin) atau alasan penolakan dari PIC/Admin
             'move_reason' => $this->move_reason,
             'rejection_reason' => $this->rejection_reason,
