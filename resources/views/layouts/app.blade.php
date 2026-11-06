@@ -81,6 +81,8 @@
             min-width: 0;
             align-items: stretch;
             justify-content: center;
+            gap: clamp(2px, .45vw, 8px);
+            margin: 0 clamp(4px, 1vw, 16px);
             overflow: visible;
         }
         .nav a {
@@ -90,8 +92,11 @@
             min-width: 0;
             min-height: 64px;
             align-items: center;
+            padding: 0 clamp(7px, .75vw, 14px);
             color: #64748b;
+            font-size: 14px;
             font-weight: 600;
+            letter-spacing: -.1px;
             white-space: nowrap;
             text-decoration: none;
             background: transparent;
@@ -99,7 +104,9 @@
         }
         .nav a::after {
             position: absolute;
+            right: clamp(7px, .75vw, 14px);
             bottom: 0;
+            left: clamp(7px, .75vw, 14px);
             height: 3px;
             border-radius: 3px 3px 0 0;
             background: transparent;
@@ -117,35 +124,6 @@
         }
         .nav a.active::after {
             background: var(--accent);
-        }
-
-        /* Navigasi khusus Admin (7 menu): Ukuran presisi & seimbang agar tidak menabrak profil */
-        .nav-admin {
-            gap: clamp(1px, .35vw, 6px);
-            margin: 0 clamp(6px, 1vw, 16px);
-        }
-        .nav-admin a {
-            padding: 0 clamp(6px, .55vw, 10px);
-            font-size: clamp(11.5px, .8vw, 12.8px);
-        }
-        .nav-admin a::after {
-            right: 6px;
-            left: 6px;
-        }
-
-        /* Navigasi khusus Guru, Organisasi, dan PIC (4-5 menu): Ukuran sedikit lebih besar, lega, dan elegan */
-        .nav-expanded {
-            gap: clamp(6px, 1.2vw, 16px);
-            margin: 0 clamp(10px, 1.8vw, 28px);
-        }
-        .nav-expanded a {
-            padding: 0 clamp(12px, 1.2vw, 18px);
-            font-size: 14.5px;
-            letter-spacing: -.1px;
-        }
-        .nav-expanded a::after {
-            right: 12px;
-            left: 12px;
         }
         .top-actions {
             display: flex;
@@ -301,22 +279,22 @@
             display: none !important;
         }
 
-        @media (max-width: 1280px) {
+        @media (max-width: 1250px) {
             .top { gap: 10px; padding: 0 16px; }
             .brand { gap: 8px; font-size: 18px; }
             .brand img { width: 32px; height: 32px; }
-            .nav-admin { gap: 1px; margin: 0 4px; }
-            .nav-admin a { min-height: 64px; padding: 0 5px; font-size: 11.5px; }
-            .nav-admin a::after { right: 4px; left: 4px; }
+            .nav { gap: 2px; margin: 0 4px; }
+            .nav a { min-height: 64px; padding: 0 6px; font-size: 13px; }
+            .nav a::after { right: 6px; left: 6px; }
             .profile-avatar { width: 32px; height: 32px; font-size: 13px; }
             .profile { max-width: 105px; font-size: 12px; }
             .profile small { font-size: 10.5px; }
             .logout button { width: 32px; height: 32px; }
         }
 
-        @media (max-width: 1050px) {
-            .nav-admin a { font-size: 11px; padding: 0 3px; }
-            .nav-admin a::after { right: 2px; left: 2px; }
+        @media (max-width: 1024px) {
+            .nav a { padding: 0 4px; font-size: 12px; }
+            .nav a::after { right: 4px; left: 4px; }
         }
 
         /* Mobile View: Tampilan Sama Persis dengan Flutter Mobile App */
@@ -444,7 +422,7 @@
                 <img src="{{ asset('images/school-emblem.png') }}" alt="">
                 <span>RAPI</span>
             </a>
-            <nav class="nav {{ in_array($currentRole, ['Guru', 'Organisasi', 'PIC']) ? 'nav-expanded' : 'nav-admin' }}" aria-label="Navigasi utama">
+            <nav class="nav" aria-label="Navigasi utama">
                 <a class="{{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">Dashboard</a>
                 <a class="{{ request()->routeIs('calendar') ? 'active' : '' }}" href="{{ route('calendar') }}">Kalender</a>
                 <a class="{{ request()->routeIs('events.*') ? 'active' : '' }}" href="{{ route('events.index') }}">Jadwal Ruangan</a>

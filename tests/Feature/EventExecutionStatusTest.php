@@ -16,7 +16,9 @@ class EventExecutionStatusTest extends TestCase
 
     public function test_automatic_execution_status_for_events(): void
     {
-        $admin = $this->userWithRole('Admin');
+        Carbon::setTestNow(Carbon::create(2026, 11, 6, 10, 0, 0, 'Asia/Jakarta'));
+        try {
+            $admin = $this->userWithRole('Admin');
         $guru = $this->userWithRole('Guru');
         $room = Room::create([
             'room_name' => 'Ruang Teater',
@@ -220,6 +222,9 @@ class EventExecutionStatusTest extends TestCase
             ->assertOk()
             ->assertSee('Agenda Kemarin Sudah Lewat')
             ->assertSee('Pengajuan Ditolak 2 Hari Lalu');
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     private function userWithRole(string $roleName): User
