@@ -606,7 +606,6 @@
     </div>
 </dialog>
 
-@if($canUseFreeTime)
 <script>
     (function () {
         var form = document.getElementById('event-form');
@@ -634,24 +633,35 @@
                 return;
             }
 
-            var room = document.getElementById('room_search').value;
+            var roomSearchEl = document.getElementById('room_search');
+            var room = roomSearchEl ? roomSearchEl.value.trim() : '';
             var multiChips = Array.from(document.querySelectorAll('#multi_room_chips span span'));
             if (multiChips.length > 0) {
-                room = multiChips.map(function(s){ return s.textContent; }).join(', ');
+                room = multiChips.map(function(s){ return s.textContent.trim(); }).filter(Boolean).join(', ');
             }
-            var title = document.getElementById('title').value.trim();
-            var date = document.getElementById('event_date').value;
-            var isRange = document.getElementById('booking_type').value === 'range';
-            var endDate = document.getElementById('end_date') ? document.getElementById('end_date').value : '';
+            var titleEl = document.getElementById('title');
+            var title = titleEl ? titleEl.value.trim() : '';
+            var dateEl = document.getElementById('event_date');
+            var date = dateEl ? dateEl.value : '';
+            var bookingTypeEl = document.getElementById('booking_type');
+            var isRange = bookingTypeEl && bookingTypeEl.value === 'range';
+            var endDateEl = document.getElementById('end_date');
+            var endDate = endDateEl ? endDateEl.value : '';
             if (isRange && endDate && endDate > date) {
                 date = date + ' s/d ' + endDate;
             }
-            var start = document.getElementById('start_time').value === 'free'
-                ? document.getElementById('start_time_free').value
-                : document.getElementById('start_time').value;
-            var end = document.getElementById('end_time').value === 'free'
-                ? document.getElementById('end_time_free').value
-                : document.getElementById('end_time').value;
+
+            var startEl = document.getElementById('start_time');
+            var startFreeEl = document.getElementById('start_time_free');
+            var start = (startEl && startEl.value === 'free' && startFreeEl)
+                ? startFreeEl.value
+                : (startEl ? startEl.value : '');
+
+            var endEl = document.getElementById('end_time');
+            var endFreeEl = document.getElementById('end_time_free');
+            var end = (endEl && endEl.value === 'free' && endFreeEl)
+                ? endFreeEl.value
+                : (endEl ? endEl.value : '');
 
             var message = 'Kirim pengajuan agenda ini?\n\nKegiatan: ' + title
                 + '\nRuangan: ' + room
@@ -672,7 +682,6 @@
         });
     })();
 </script>
-@endif
 @if($canUseFreeTime)
 <script>
     ['start_time', 'end_time'].forEach(function (field) {

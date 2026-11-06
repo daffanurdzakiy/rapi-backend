@@ -47,6 +47,40 @@
     </div>
 </form>
 
+<dialog id="confirm-complaint-dialog" class="confirm-dialog" aria-labelledby="confirm-complaint-heading">
+    <div class="confirm-dialog-heading">
+        <div>
+            <h2 id="confirm-complaint-heading">Konfirmasi Pengaduan Fasilitas</h2>
+            <p>Periksa kembali detail laporan kerusakan sebelum dikirim</p>
+        </div>
+        <button class="confirm-dialog-close" type="button" id="confirm-complaint-close" aria-label="Tutup dialog">×</button>
+    </div>
+    <div class="confirm-dialog-body">
+        <div class="confirm-dialog-details">
+            <div class="confirm-item">
+                <span class="confirm-label">Nama Pengadu:</span>
+                <span class="confirm-value" id="confirm-complaint-reporter">{{ $reporterName }}</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Ruangan:</span>
+                <span class="confirm-value" id="confirm-complaint-room">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Deskripsi Kerusakan:</span>
+                <span class="confirm-value" id="confirm-complaint-desc">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Foto Bukti:</span>
+                <span class="confirm-value" id="confirm-complaint-photo">-</span>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-dialog-footer">
+        <button class="btn ghost" type="button" id="confirm-complaint-cancel">Batal</button>
+        <button class="btn" type="button" id="confirm-complaint-ok">Ya, Kirim Pengaduan</button>
+    </div>
+</dialog>
+
 <script>
     (function () {
         var form = document.getElementById('complaint-form');
@@ -225,12 +259,67 @@
         });
 
         document.getElementById('close-camera').addEventListener('click', stopCamera);
+
+        var confirmDialog = document.getElementById('confirm-complaint-dialog');
+        var btnConfirmCancel = document.getElementById('confirm-complaint-cancel');
+        var btnConfirmClose = document.getElementById('confirm-complaint-close');
+        var btnConfirmOk = document.getElementById('confirm-complaint-ok');
+
+        if (btnConfirmClose && confirmDialog) {
+            btnConfirmClose.addEventListener('click', function () { confirmDialog.close(); });
+        }
+        if (btnConfirmCancel && confirmDialog) {
+            btnConfirmCancel.addEventListener('click', function () { confirmDialog.close(); });
+        }
+        if (btnConfirmOk && confirmDialog && form) {
+            btnConfirmOk.addEventListener('click', function () {
+                confirmDialog.close();
+                form.dataset.confirmed = 'true';
+                form.submit();
+            });
+        }
+
         form.addEventListener('submit', function (event) {
+            if (form.dataset.confirmed === 'true') {
+                return;
+            }
+
             if (!photoInput.files.length) {
                 event.preventDefault();
                 cameraError.textContent = 'Pilih foto atau ambil foto dari kamera sebelum mengirim pengaduan.';
                 cameraError.hidden = false;
                 photoInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
+            var descEl = document.getElementById('description');
+            if (!descEl || !descEl.value.trim()) {
+                event.preventDefault();
+                if (descEl) descEl.focus();
+                return;
+            }
+
+            var roomName = '';
+            var roomSelect = form.querySelector('select[name="room_id"]');
+            if (roomSelect && roomSelect.selectedOptions && roomSelect.selectedOptions[0]) {
+                roomName = roomSelect.selectedOptions[0].text;
+            } else {
+                var selectedRoomEl = form.querySelector('input[type="hidden"][name="room_id"]');
+                if (selectedRoomEl) {
+                    var prevP = selectedRoomEl.previousElementSibling;
+                    roomName = prevP ? prevP.textContent.trim() : '';
+                }
+            }
+
+            var photoName = photoInput.files[0] ? (photoInput.files[0].name + ' (' + formatBytes(photoInput.files[0].size) + ')') : '1 Foto terlampir';
+
+            if (confirmDialog && typeof confirmDialog.showModal === 'function') {
+                event.preventDefault();
+                document.getElementById('confirm-complaint-room').textContent = roomName || '-';
+                document.getElementById('confirm-complaint-desc').textContent = descEl.value.trim() || '-';
+                document.getElementById('confirm-complaint-photo').textContent = photoName;
+                confirmDialog.showModal();
+                return;
             }
         });
         window.addEventListener('beforeunload', function () {
