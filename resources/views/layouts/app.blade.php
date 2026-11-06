@@ -40,25 +40,25 @@
             top: 0;
             z-index: 20;
             display: flex;
-            min-height: 76px;
+            min-height: 64px;
             align-items: center;
             justify-content: space-between;
-            gap: 24px;
-            padding: 0 clamp(16px, 2.4vw, 36px);
-            border-top: 4px solid #35465e;
+            gap: 16px;
+            padding: 0 clamp(16px, 2.5vw, 36px);
+            border-top: 3.5px solid #35465e;
             border-bottom: 1px solid #e2dbcb;
             background: rgba(255, 253, 248, .98);
-            box-shadow: 0 4px 20px rgba(38, 54, 74, .06);
-            backdrop-filter: blur(16px);
+            box-shadow: 0 4px 18px rgba(38, 54, 74, .06);
+            backdrop-filter: blur(14px);
         }
         .brand {
             display: inline-flex;
-            flex: 0 0 220px;
+            flex: 0 0 auto;
             align-items: center;
-            gap: 12px;
-            color: #26364a;
+            gap: 10px;
+            color: #1e293b;
             font-family: Inter, system-ui, -apple-system, sans-serif;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
             letter-spacing: .02em;
             text-decoration: none;
@@ -70,10 +70,10 @@
         }
         .brand img {
             display: block;
-            width: 38px;
-            height: 38px;
+            width: 36px;
+            height: 36px;
             object-fit: contain;
-            filter: drop-shadow(0 2px 5px rgba(38, 54, 74, .12));
+            filter: drop-shadow(0 2px 4px rgba(38, 54, 74, .12));
         }
         .nav {
             display: flex;
@@ -81,7 +81,8 @@
             min-width: 0;
             align-items: stretch;
             justify-content: center;
-            gap: clamp(4px, .6vw, 10px);
+            gap: clamp(2px, .4vw, 8px);
+            margin: 0 clamp(8px, 1.2vw, 20px);
             overflow: visible;
         }
         .nav a {
@@ -89,11 +90,11 @@
             display: inline-flex;
             flex: 0 0 auto;
             min-width: 0;
-            min-height: 76px;
+            min-height: 64px;
             align-items: center;
-            padding: 0 clamp(10px, 1vw, 16px);
+            padding: 0 clamp(8px, .75vw, 12px);
             color: #64748b;
-            font-size: clamp(13px, .92vw, 14.5px);
+            font-size: clamp(12px, .84vw, 13px);
             font-weight: 600;
             white-space: nowrap;
             text-decoration: none;
@@ -102,9 +103,9 @@
         }
         .nav a::after {
             position: absolute;
-            right: 12px;
+            right: 8px;
             bottom: 0;
-            left: 12px;
+            left: 8px;
             height: 3px;
             border-radius: 3px 3px 0 0;
             background: transparent;
@@ -125,18 +126,17 @@
         }
         .top-actions {
             display: flex;
-            flex: 0 0 220px;
-            justify-content: flex-end;
+            flex: 0 0 auto;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
         .profile-link {
             display: inline-flex;
             min-width: 0;
             align-items: center;
-            gap: 11px;
-            padding: 6px 10px;
-            border-radius: 12px;
+            gap: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
             color: #26364a;
             text-decoration: none;
             transition: background .18s, transform .18s;
@@ -148,17 +148,17 @@
         }
         .profile-avatar {
             display: grid;
-            flex: 0 0 40px;
-            width: 40px;
-            height: 40px;
+            flex: 0 0 36px;
+            width: 36px;
+            height: 36px;
             place-items: center;
             border: 1.5px solid #d7deea;
             border-radius: 50%;
             background: #eef2f7;
             color: #35465e;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 700;
-            box-shadow: 0 2px 6px rgba(38, 54, 74, .08);
+            box-shadow: 0 2px 5px rgba(38, 54, 74, .08);
             transition: background .18s, border-color .18s, transform .18s;
         }
         .profile-link:hover .profile-avatar {
@@ -166,20 +166,20 @@
             background: #e2e8f0;
         }
         .profile {
-            max-width: 150px;
+            max-width: 140px;
             overflow: hidden;
             color: #1e293b;
-            font-size: 13.5px;
+            font-size: 13px;
             font-weight: 700;
-            line-height: 1.35;
+            line-height: 1.25;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         .profile small {
             display: block;
-            margin-top: 2px;
+            margin-top: 1px;
             color: #64748b;
-            font-size: 11.5px;
+            font-size: 11px;
             font-weight: 500;
         }
         .logout {
@@ -187,20 +187,20 @@
         }
         .logout button {
             display: grid;
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             place-items: center;
             padding: 0;
             border: 1px solid #d7deea;
-            border-radius: 10px;
+            border-radius: 9px;
             background: #f8fafc;
             color: #64748b;
             cursor: pointer;
             transition: background .18s, color .18s, border-color .18s, transform .18s;
         }
         .logout button svg {
-            width: 19px;
-            height: 19px;
+            width: 17px;
+            height: 17px;
             fill: none;
             stroke: currentColor;
             stroke-linecap: round;
@@ -278,27 +278,28 @@
             display: none;
         }
 
-        @media (max-width: 1150px) {
-            .top { gap: 14px; padding: 0 16px; }
-            .brand { flex: 0 0 auto; gap: 8px; font-size: 20px; }
-            .brand img { width: 34px; height: 34px; }
-            .nav { gap: 4px; }
-            .nav a { min-height: 72px; padding: 0 8px; font-size: 13px; }
-            .nav a::after { right: 8px; left: 8px; }
-            .top-actions { flex: 0 0 auto; }
-            .profile { max-width: 110px; font-size: 12.5px; }
-            .profile small { font-size: 11px; }
+        @media (max-width: 1200px) {
+            .top { gap: 10px; padding: 0 16px; }
+            .brand { gap: 8px; font-size: 18px; }
+            .brand img { width: 32px; height: 32px; }
+            .nav { gap: 2px; margin: 0 6px; }
+            .nav a { min-height: 64px; padding: 0 6px; font-size: 12px; }
+            .nav a::after { right: 5px; left: 5px; }
+            .profile-avatar { width: 32px; height: 32px; font-size: 13px; }
+            .profile { max-width: 110px; font-size: 12px; }
+            .profile small { font-size: 10.5px; }
+            .logout button { width: 32px; height: 32px; }
         }
 
         /* Mobile View: Tampilan Sama Persis dengan Flutter Mobile App */
         @media (max-width: 800px) {
             .top {
-                min-height: 64px;
-                padding: 0 16px;
+                min-height: 58px;
+                padding: 0 14px;
                 justify-content: space-between;
-                gap: 12px;
+                gap: 10px;
             }
-            .brand { font-size: 20px; gap: 8px; }
+            .brand { font-size: 19px; gap: 8px; }
             .brand img { width: 32px; height: 32px; }
             
             /* Sembunyikan desktop navbar dari atas */
@@ -308,22 +309,35 @@
 
             .top-actions {
                 margin-left: auto;
-                gap: 10px;
+                gap: 8px;
             }
             .profile-avatar {
-                flex-basis: 36px;
-                width: 36px;
-                height: 36px;
-                font-size: 13.5px;
+                flex-basis: 34px;
+                width: 34px;
+                height: 34px;
+                font-size: 13px;
             }
             .profile {
-                max-width: 120px;
-                font-size: 12.5px;
+                max-width: 110px;
+                font-size: 12px;
             }
             .profile small {
                 display: block;
-                font-size: 10.5px;
+                font-size: 10px;
             }
+            .logout button {
+                width: 34px;
+                height: 34px;
+            }
+            .logout button svg {
+                width: 16px;
+                height: 16px;
+            }
+
+            .content {
+                padding: 18px 12px 90px;
+            }
+        }
             .logout button {
                 width: 36px;
                 height: 36px;
