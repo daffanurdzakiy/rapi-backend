@@ -81,8 +81,8 @@
             min-width: 0;
             align-items: stretch;
             justify-content: center;
-            gap: clamp(2px, .45vw, 8px);
-            margin: 0 clamp(4px, 1vw, 16px);
+            gap: clamp(4px, .6vw, 12px);
+            margin: 0 clamp(4px, .8vw, 14px);
             overflow: visible;
         }
         .nav a {
@@ -92,11 +92,12 @@
             min-width: 0;
             min-height: 64px;
             align-items: center;
-            padding: 0 clamp(7px, .75vw, 14px);
+            padding: 0 clamp(9px, .9vw, 16px);
             color: #64748b;
             font-size: 14px;
             font-weight: 600;
-            letter-spacing: -.1px;
+            letter-spacing: 0;
+            word-spacing: 1px;
             white-space: nowrap;
             text-decoration: none;
             background: transparent;
@@ -104,9 +105,9 @@
         }
         .nav a::after {
             position: absolute;
-            right: clamp(7px, .75vw, 14px);
+            right: clamp(9px, .9vw, 16px);
             bottom: 0;
-            left: clamp(7px, .75vw, 14px);
+            left: clamp(9px, .9vw, 16px);
             height: 3px;
             border-radius: 3px 3px 0 0;
             background: transparent;
@@ -283,9 +284,9 @@
             .top { gap: 10px; padding: 0 16px; }
             .brand { gap: 8px; font-size: 18px; }
             .brand img { width: 32px; height: 32px; }
-            .nav { gap: 2px; margin: 0 4px; }
-            .nav a { min-height: 64px; padding: 0 6px; font-size: 13px; }
-            .nav a::after { right: 6px; left: 6px; }
+            .nav { gap: 4px; margin: 0 4px; }
+            .nav a { min-height: 64px; padding: 0 7px; font-size: 13px; word-spacing: .5px; }
+            .nav a::after { right: 7px; left: 7px; }
             .profile-avatar { width: 32px; height: 32px; font-size: 13px; }
             .profile { max-width: 105px; font-size: 12px; }
             .profile small { font-size: 10.5px; }
