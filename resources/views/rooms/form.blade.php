@@ -36,22 +36,101 @@
         <a class="btn ghost" href="{{ route('rooms.index') }}">Batal</a>
     </div>
 </form>
-@if(! $room)
+
+<dialog id="confirm-room-dialog" class="confirm-dialog" aria-labelledby="confirm-room-title">
+    <div class="confirm-dialog-heading">
+        <div>
+            <h2 id="confirm-room-title">{{ $room ? 'Konfirmasi Perubahan Ruangan' : 'Konfirmasi Penambahan Ruangan' }}</h2>
+            <p>Periksa kembali detail informasi ruangan sebelum disimpan</p>
+        </div>
+        <button class="confirm-dialog-close" type="button" id="confirm-room-close" aria-label="Tutup dialog">×</button>
+    </div>
+    <div class="confirm-dialog-body">
+        <div class="confirm-dialog-details">
+            <div class="confirm-item">
+                <span class="confirm-label">Nama ruangan:</span>
+                <span class="confirm-value" id="confirm-display-name">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Lokasi:</span>
+                <span class="confirm-value" id="confirm-display-location">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Kapasitas:</span>
+                <span class="confirm-value" id="confirm-display-capacity">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">PIC:</span>
+                <span class="confirm-value" id="confirm-display-pic">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Deskripsi:</span>
+                <span class="confirm-value" id="confirm-display-description">-</span>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-dialog-footer">
+        <button class="btn ghost" type="button" id="confirm-room-cancel">Batal</button>
+        <button class="btn" type="button" id="confirm-room-ok">Ya, Simpan Ruangan</button>
+    </div>
+</dialog>
+
 <script>
-    document.getElementById('room-form').addEventListener('submit', function (event) {
-        var roomName = document.getElementById('room_name').value.trim();
-        var location = document.getElementById('location').value.trim() || 'Tidak diisi';
-        var capacity = document.getElementById('capacity').value;
-        var pic = document.getElementById('pic_id').selectedOptions[0].text;
-        var description = document.getElementById('description').value.trim() || 'Tidak diisi';
-        var message = 'Konfirmasi penambahan ruangan ini?'
-            + '\n\nNama ruangan: ' + roomName
-            + '\nLokasi: ' + location
-            + '\nKapasitas: ' + capacity
-            + '\nPIC: ' + pic
-            + '\nDeskripsi: ' + description;
-        if (!window.confirm(message)) event.preventDefault();
-    });
+    (function () {
+        var form = document.getElementById('room-form');
+        var dialog = document.getElementById('confirm-room-dialog');
+        var btnCancel = document.getElementById('confirm-room-cancel');
+        var btnClose = document.getElementById('confirm-room-close');
+        var btnOk = document.getElementById('confirm-room-ok');
+
+        if (btnClose) {
+            btnClose.addEventListener('click', function () { dialog.close(); });
+        }
+        if (btnCancel) {
+            btnCancel.addEventListener('click', function () { dialog.close(); });
+        }
+        if (btnOk) {
+            btnOk.addEventListener('click', function () {
+                dialog.close();
+                form.dataset.confirmed = 'true';
+                form.submit();
+            });
+        }
+
+        form.addEventListener('submit', function (event) {
+            if (form.dataset.confirmed === 'true') {
+                return;
+            }
+
+            var roomName = document.getElementById('room_name').value.trim();
+            var location = document.getElementById('location').value.trim() || 'Tidak diisi';
+            var capacity = document.getElementById('capacity').value;
+            var picSelect = document.getElementById('pic_id');
+            var pic = (picSelect.selectedOptions && picSelect.selectedOptions[0]) ? picSelect.selectedOptions[0].text : 'Tidak dipilih';
+            var description = document.getElementById('description').value.trim() || 'Tidak diisi';
+
+            var message = 'Konfirmasi penambahan ruangan ini?'
+                + '\n\nNama ruangan: ' + roomName
+                + '\nLokasi: ' + location
+                + '\nKapasitas: ' + capacity
+                + '\nPIC: ' + pic
+                + '\nDeskripsi: ' + description;
+
+            if (dialog && typeof dialog.showModal === 'function') {
+                event.preventDefault();
+                document.getElementById('confirm-display-name').textContent = roomName || '-';
+                document.getElementById('confirm-display-location').textContent = location;
+                document.getElementById('confirm-display-capacity').textContent = (capacity || '0') + ' orang';
+                document.getElementById('confirm-display-pic').textContent = pic;
+                document.getElementById('confirm-display-description').textContent = description;
+                dialog.showModal();
+                return;
+            }
+
+            if (!window.confirm(message)) {
+                event.preventDefault();
+            }
+        });
+    })();
 </script>
-@endif
 @endsection

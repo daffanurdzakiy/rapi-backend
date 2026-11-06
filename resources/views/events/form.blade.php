@@ -572,33 +572,105 @@
         });
     })();
 </script>
+<dialog id="confirm-booking-dialog" class="confirm-dialog" aria-labelledby="confirm-booking-heading">
+    <div class="confirm-dialog-heading">
+        <div>
+            <h2 id="confirm-booking-heading">Konfirmasi Pengajuan Ruangan</h2>
+            <p>Periksa kembali detail informasi peminjaman sebelum mengajukan</p>
+        </div>
+        <button class="confirm-dialog-close" type="button" id="confirm-booking-close" aria-label="Tutup dialog">×</button>
+    </div>
+    <div class="confirm-dialog-body">
+        <div class="confirm-dialog-details">
+            <div class="confirm-item">
+                <span class="confirm-label">Nama Kegiatan:</span>
+                <span class="confirm-value" id="confirm-booking-title">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Ruangan:</span>
+                <span class="confirm-value" id="confirm-booking-room">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Tanggal:</span>
+                <span class="confirm-value" id="confirm-booking-date">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Waktu / Sesi:</span>
+                <span class="confirm-value" id="confirm-booking-time">-</span>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-dialog-footer">
+        <button class="btn ghost" type="button" id="confirm-booking-cancel">Batal</button>
+        <button class="btn" type="button" id="confirm-booking-ok">Ya, Kirim Pengajuan</button>
+    </div>
+</dialog>
+
 @if($canUseFreeTime)
 <script>
-    document.getElementById('event-form').addEventListener('submit', function (event) {
-        var room = document.getElementById('room_search').value;
-        var multiChips = Array.from(document.querySelectorAll('#multi_room_chips span span'));
-        if (multiChips.length > 0) {
-            room = multiChips.map(function(s){ return s.textContent; }).join(', ');
+    (function () {
+        var form = document.getElementById('event-form');
+        var dialog = document.getElementById('confirm-booking-dialog');
+        var btnCancel = document.getElementById('confirm-booking-cancel');
+        var btnClose = document.getElementById('confirm-booking-close');
+        var btnOk = document.getElementById('confirm-booking-ok');
+
+        if (btnClose && dialog) {
+            btnClose.addEventListener('click', function () { dialog.close(); });
         }
-        var title = document.getElementById('title').value.trim();
-        var date = document.getElementById('event_date').value;
-        var isRange = document.getElementById('booking_type').value === 'range';
-        var endDate = document.getElementById('end_date') ? document.getElementById('end_date').value : '';
-        if (isRange && endDate && endDate > date) {
-            date = date + ' s/d ' + endDate;
+        if (btnCancel && dialog) {
+            btnCancel.addEventListener('click', function () { dialog.close(); });
         }
-        var start = document.getElementById('start_time').value === 'free'
-            ? document.getElementById('start_time_free').value
-            : document.getElementById('start_time').value;
-        var end = document.getElementById('end_time').value === 'free'
-            ? document.getElementById('end_time_free').value
-            : document.getElementById('end_time').value;
-        var message = 'Kirim pengajuan agenda ini?\n\nKegiatan: ' + title
-            + '\nRuangan: ' + room
-            + '\nTanggal: ' + date
-            + '\nWaktu: ' + start + ' - ' + end;
-        if (!window.confirm(message)) event.preventDefault();
-    });
+        if (btnOk && dialog && form) {
+            btnOk.addEventListener('click', function () {
+                dialog.close();
+                form.dataset.confirmed = 'true';
+                form.submit();
+            });
+        }
+
+        form.addEventListener('submit', function (event) {
+            if (form.dataset.confirmed === 'true') {
+                return;
+            }
+
+            var room = document.getElementById('room_search').value;
+            var multiChips = Array.from(document.querySelectorAll('#multi_room_chips span span'));
+            if (multiChips.length > 0) {
+                room = multiChips.map(function(s){ return s.textContent; }).join(', ');
+            }
+            var title = document.getElementById('title').value.trim();
+            var date = document.getElementById('event_date').value;
+            var isRange = document.getElementById('booking_type').value === 'range';
+            var endDate = document.getElementById('end_date') ? document.getElementById('end_date').value : '';
+            if (isRange && endDate && endDate > date) {
+                date = date + ' s/d ' + endDate;
+            }
+            var start = document.getElementById('start_time').value === 'free'
+                ? document.getElementById('start_time_free').value
+                : document.getElementById('start_time').value;
+            var end = document.getElementById('end_time').value === 'free'
+                ? document.getElementById('end_time_free').value
+                : document.getElementById('end_time').value;
+
+            var message = 'Kirim pengajuan agenda ini?\n\nKegiatan: ' + title
+                + '\nRuangan: ' + room
+                + '\nTanggal: ' + date
+                + '\nWaktu: ' + start + ' - ' + end;
+
+            if (dialog && typeof dialog.showModal === 'function') {
+                event.preventDefault();
+                document.getElementById('confirm-booking-title').textContent = title || '-';
+                document.getElementById('confirm-booking-room').textContent = room || '-';
+                document.getElementById('confirm-booking-date').textContent = date || '-';
+                document.getElementById('confirm-booking-time').textContent = (start || '-') + ' - ' + (end || '-');
+                dialog.showModal();
+                return;
+            }
+
+            if (!window.confirm(message)) event.preventDefault();
+        });
+    })();
 </script>
 @endif
 @if($canUseFreeTime)

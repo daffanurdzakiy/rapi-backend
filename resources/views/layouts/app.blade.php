@@ -275,6 +275,116 @@
         img { max-width: 100%; }
         [hidden] { display: none !important; }
 
+        /* =========================================================================
+           CUSTOM MODERN MODAL DIALOG (TEMA SESUAI DESAIN RAPI / MIRIP KALENDER)
+           ========================================================================= */
+        .confirm-dialog {
+            width: min(500px, calc(100% - 32px));
+            max-height: min(86vh, 660px);
+            overflow: auto;
+            margin: auto;
+            padding: 0;
+            border: 1px solid #e8e1d3;
+            border-radius: 22px;
+            background: #fffdf8;
+            color: #26364a;
+            box-shadow: 0 24px 80px rgba(38, 54, 74, .25);
+        }
+        .confirm-dialog::backdrop {
+            background: rgba(38, 54, 74, .36);
+            backdrop-filter: blur(5px);
+        }
+        .confirm-dialog-heading {
+            display: flex;
+            align-items: start;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 24px 26px 18px;
+            border-bottom: 1px solid #e8e1d3;
+        }
+        .confirm-dialog-heading h2 {
+            margin: 0;
+            color: #26364a;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -.3px;
+        }
+        .confirm-dialog-heading p {
+            margin: 4px 0 0;
+            color: #6d7788;
+            font-size: 13px;
+        }
+        .confirm-dialog-close {
+            display: grid;
+            flex: 0 0 32px;
+            width: 32px;
+            height: 32px;
+            place-items: center;
+            border: 0;
+            border-radius: 50%;
+            background: #f1f3f6;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 20px;
+            line-height: 1;
+            transition: background .18s, color .18s, transform .18s;
+        }
+        .confirm-dialog-close:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+            transform: rotate(90deg);
+        }
+        .confirm-dialog-body {
+            padding: 22px 26px;
+        }
+        .confirm-dialog-details {
+            border-left: 3.5px solid #d97706; /* Garis aksen oranye seperti pada tampilan kalender */
+            padding-left: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .confirm-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .confirm-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #6d7788;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+        .confirm-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #26364a;
+            word-break: break-word;
+        }
+        .confirm-pill {
+            display: inline-flex;
+            align-items: center;
+            align-self: flex-start;
+            margin-top: 3px;
+            padding: 2px 10px;
+            border: 1px solid #fde68a;
+            border-radius: 99px;
+            background: #fef3c7;
+            color: #92400e;
+            font-size: 11.5px;
+            font-weight: 600;
+        }
+        .confirm-dialog-footer {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 26px 22px;
+            border-top: 1px solid #e8e1d3;
+            background: #fbf9f4;
+        }
+
         /* Mobile Bottom Navigation (Mirip Flutter NavigationBar) */
         .mobile-bottom-nav {
             display: none !important;

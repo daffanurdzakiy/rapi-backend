@@ -227,6 +227,44 @@
     </form>
 </div>
 
+<dialog id="confirm-move-dialog" class="confirm-dialog" aria-labelledby="confirm-move-heading">
+    <div class="confirm-dialog-heading">
+        <div>
+            <h2 id="confirm-move-heading">Konfirmasi Pemindahan Ruangan</h2>
+            <p>Pastikan detail pemindahan ruangan agenda ini sudah sesuai</p>
+        </div>
+        <button class="confirm-dialog-close" type="button" id="confirm-move-close" aria-label="Tutup dialog">×</button>
+    </div>
+    <div class="confirm-dialog-body">
+        <div class="confirm-dialog-details">
+            <div class="confirm-item">
+                <span class="confirm-label">Nama Kegiatan:</span>
+                <span class="confirm-value" id="confirm-move-title">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Ruangan Semula:</span>
+                <span class="confirm-value" id="confirm-move-from">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Ruangan Baru:</span>
+                <span class="confirm-value" id="confirm-move-to">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Tanggal Pelaksanaan:</span>
+                <span class="confirm-value" id="confirm-move-date">-</span>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Alasan Pemindahan:</span>
+                <span class="confirm-value" id="confirm-move-reason">-</span>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-dialog-footer">
+        <button class="btn ghost" type="button" id="confirm-move-cancel">Batal</button>
+        <button class="btn" type="button" id="confirm-move-ok">Ya, Pindahkan Ruangan</button>
+    </div>
+</dialog>
+
 <script>
     (function () {
         var approvedEvents = @json($approvedEventsOnDate);
@@ -522,13 +560,48 @@
                 return;
             }
 
-            if (String(roomId.value) !== String(originalRoomId) && !moveReasonTextarea.value.trim()) {
-                event.preventDefault();
-                alert('Alasan pemindahan ruangan wajib diisi.');
-                moveReasonTextarea.focus();
-                return;
+            if (String(roomId.value) !== String(originalRoomId)) {
+                if (!moveReasonTextarea.value.trim()) {
+                    event.preventDefault();
+                    alert('Alasan pemindahan ruangan wajib diisi.');
+                    moveReasonTextarea.focus();
+                    return;
+                }
+
+                var moveDialog = document.getElementById('confirm-move-dialog');
+                var editForm = document.getElementById('edit-event-form');
+                if (editForm.dataset.confirmed !== 'true' && moveDialog && typeof moveDialog.showModal === 'function') {
+                    event.preventDefault();
+                    document.getElementById('confirm-move-title').textContent = @json($event->title);
+                    document.getElementById('confirm-move-from').textContent = originalRoomName;
+                    document.getElementById('confirm-move-to').textContent = search.value.trim();
+                    document.getElementById('confirm-move-date').textContent = eventDateStr;
+                    document.getElementById('confirm-move-reason').textContent = moveReasonTextarea.value.trim();
+                    moveDialog.showModal();
+                    return;
+                }
             }
         });
+
+        var moveDialog = document.getElementById('confirm-move-dialog');
+        var btnMoveCancel = document.getElementById('confirm-move-cancel');
+        var btnMoveClose = document.getElementById('confirm-move-close');
+        var btnMoveOk = document.getElementById('confirm-move-ok');
+        var editFormEl = document.getElementById('edit-event-form');
+
+        if (btnMoveClose && moveDialog) {
+            btnMoveClose.addEventListener('click', function () { moveDialog.close(); });
+        }
+        if (btnMoveCancel && moveDialog) {
+            btnMoveCancel.addEventListener('click', function () { moveDialog.close(); });
+        }
+        if (btnMoveOk && moveDialog && editFormEl) {
+            btnMoveOk.addEventListener('click', function () {
+                moveDialog.close();
+                editFormEl.dataset.confirmed = 'true';
+                editFormEl.submit();
+            });
+        }
 
         // Inisialisasi awal saat halaman dibuka
         checkAvailabilityStatus();
