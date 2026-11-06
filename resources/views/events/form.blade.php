@@ -33,23 +33,34 @@
             <input id="title" name="title" value="{{ old('title') }}" required>
         </div>
         <div>
-            <label for="room_search">{{ $canUseFreeTime ? 'Pilih ruangan' : 'Ruangan' }}</label>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <label for="room_search" id="room_select_label">{{ $canUseFreeTime ? 'Pilih ruangan' : 'Ruangan' }}</label>
+                <button type="button" id="btn_toggle_multi_room" class="btn ghost" style="min-height:26px; padding:2px 10px; font-size:11.5px; border-radius:6px; margin-bottom:7px; cursor:pointer;" title="Klik untuk meminjam lebih dari 1 ruangan sekaligus">
+                    + Peminjaman lebih dari 1 ruangan
+                </button>
+            </div>
             <div class="room-picker">
                 <div class="room-picker-input-wrap">
                     <input id="room_search" type="search" value="{{ $selectedRoom?->room_name }}" placeholder="Pilih atau cari ruangan..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="room-options" required>
                     <button type="button" id="room_picker_toggle" class="room-picker-toggle-btn" aria-label="Buka pilihan ruangan">▼</button>
                 </div>
                 <input id="room_id" type="hidden" name="room_id" value="{{ old('room_id') }}">
+                <div id="multi_room_chips" style="display:none; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
                 <ul id="room-options" class="room-picker-list" role="listbox" hidden>
                 @foreach($rooms as $room)
                     <li role="option">
                         <button class="room-picker-option" type="button" data-room-id="{{ $room->id }}" data-room-name="{{ $room->room_name }}">
-                            <b>{{ $room->room_name }}</b>
-                            @if($room->location || $room->capacity)
-                                <div style="font-size:11px;color:#6d7788;margin-top:2px">
-                                    {{ $room->location ? $room->location . ' · ' : '' }}Kapasitas {{ $room->capacity }} orang
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <b>{{ $room->room_name }}</b>
+                                    @if($room->location || $room->capacity)
+                                        <div style="font-size:11px;color:#6d7788;margin-top:2px">
+                                            {{ $room->location ? $room->location . ' · ' : '' }}Kapasitas {{ $room->capacity }} orang
+                                        </div>
+                                    @endif
                                 </div>
-                            @endif
+                                <span class="room-check-badge" style="display:none; font-size:11.5px; font-weight:700; color:#166534; background:#dcfce7; padding:2px 8px; border-radius:999px;">✓ Terpilih</span>
+                            </div>
                         </button>
                     </li>
                 @endforeach
@@ -57,6 +68,7 @@
                 </ul>
             </div>
             @error('room_id')<p class="error">{{ $message }}</p>@enderror
+            @error('room_ids')<p class="error">{{ $message }}</p>@enderror
         </div>
         <div>
             <div style="display:flex; justify-content:space-between; align-items:flex-end;">
@@ -125,7 +137,11 @@
             @error('end_time')<p class="error">{{ $message }}</p>@enderror
         </div>
     </div>
-    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+    <div id="availability-alert" style="display:none; margin-top:16px; padding:12px 16px; border-radius:8px; font-size:13px; line-height:1.5;"></div>
+    <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:10px; margin-top:20px;">
+        <button type="button" id="btn-validate-rooms" class="btn ghost" style="border:1.5px solid #2563eb; color:#1d4ed8; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;" title="Periksa apakah seluruh ruangan yang dipilih sedang dipakai atau tersedia">
+            🔍 Validasi Ketersediaan Ruangan
+        </button>
         <a class="btn ghost" href="{{ route('events.index') }}">Batal</a>
         <button class="btn" type="submit">Ajukan</button>
     </div>
@@ -141,6 +157,17 @@
         var picker = search.closest('.room-picker');
         var toggleBtn = document.getElementById('room_picker_toggle');
         var selectedRoomName = search.value.trim();
+
+        // Multi-ruangan state
+        var btnToggleMultiRoom = document.getElementById('btn_toggle_multi_room');
+        var roomSelectLabel = document.getElementById('room_select_label');
+        var multiRoomChips = document.getElementById('multi_room_chips');
+        var isMultiRoom = false;
+        var selectedRooms = [];
+
+        if (roomId.value && selectedRoomName) {
+            selectedRooms.push({ id: roomId.value, name: selectedRoomName });
+        }
 
         function openList(forceShowAll) {
             list.hidden = false;
@@ -163,16 +190,108 @@
                 var matches = showAll || option.dataset.roomName.toLocaleLowerCase().includes(query);
                 option.parentElement.hidden = !matches;
                 if (matches) visibleCount++;
+
+                // Sync badge
+                var badge = option.querySelector('.room-check-badge');
+                if (badge) {
+                    var isSelected = selectedRooms.some(function (r) { return String(r.id) === String(option.dataset.roomId); });
+                    badge.style.display = isSelected ? 'inline-block' : 'none';
+                }
             });
             empty.hidden = visibleCount > 0;
         }
 
+        function renderMultiRoomChips() {
+            multiRoomChips.innerHTML = '';
+            if (!isMultiRoom || selectedRooms.length === 0) {
+                multiRoomChips.style.display = 'none';
+                return;
+            }
+            multiRoomChips.style.display = 'flex';
+            selectedRooms.forEach(function (r) {
+                var chip = document.createElement('span');
+                chip.style.cssText = 'background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:16px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px; border:1px solid #bae6fd;';
+                chip.innerHTML = '<span>' + r.name + '</span><button type="button" data-remove-room-id="' + r.id + '" style="background:transparent; border:none; color:#0284c7; cursor:pointer; font-weight:bold; font-size:13px; line-height:1; padding:0 2px;">✕</button><input type="hidden" name="room_ids[]" value="' + r.id + '">';
+                multiRoomChips.appendChild(chip);
+            });
+
+            // Update main roomId to first selected
+            if (selectedRooms.length > 0) {
+                roomId.value = selectedRooms[0].id;
+                search.removeAttribute('required');
+                search.setCustomValidity('');
+            } else {
+                roomId.value = '';
+                search.setAttribute('required', 'required');
+            }
+        }
+
+        multiRoomChips.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-remove-room-id]');
+            if (btn) {
+                var rid = btn.dataset.removeRoomId;
+                selectedRooms = selectedRooms.filter(function (r) { return String(r.id) !== String(rid); });
+                renderMultiRoomChips();
+                filterRooms(false);
+            }
+        });
+
+        function toggleMultiRoomMode() {
+            isMultiRoom = !isMultiRoom;
+            if (isMultiRoom) {
+                btnToggleMultiRoom.textContent = '✕ Batal (1 Ruangan)';
+                btnToggleMultiRoom.style.color = '#35465e';
+                btnToggleMultiRoom.style.background = '#e8edf4';
+                roomSelectLabel.textContent = 'Pilih Ruangan (Bisa lebih dari 1)';
+                search.placeholder = 'Pilih atau cari ruangan lainnya...';
+                if (roomId.value && selectedRoomName && selectedRooms.length === 0) {
+                    selectedRooms.push({ id: roomId.value, name: selectedRoomName });
+                }
+                search.value = '';
+                renderMultiRoomChips();
+            } else {
+                btnToggleMultiRoom.textContent = '+ Peminjaman lebih dari 1 ruangan';
+                btnToggleMultiRoom.style.color = '';
+                btnToggleMultiRoom.style.background = '';
+                roomSelectLabel.textContent = '{{ $canUseFreeTime ? "Pilih ruangan" : "Ruangan" }}';
+                search.placeholder = 'Pilih atau cari ruangan...';
+                multiRoomChips.style.display = 'none';
+                multiRoomChips.innerHTML = '';
+                if (selectedRooms.length > 0) {
+                    var first = selectedRooms[0];
+                    selectedRooms = [first];
+                    roomId.value = first.id;
+                    selectedRoomName = first.name;
+                    search.value = first.name;
+                }
+                search.setAttribute('required', 'required');
+            }
+            filterRooms(true);
+        }
+
+        btnToggleMultiRoom.addEventListener('click', toggleMultiRoomMode);
+
         function chooseRoom(option) {
-            roomId.value = option.dataset.roomId;
-            selectedRoomName = option.dataset.roomName;
-            search.value = option.dataset.roomName;
-            search.setCustomValidity('');
-            closeList();
+            var optId = option.dataset.roomId;
+            var optName = option.dataset.roomName;
+
+            if (isMultiRoom) {
+                var existsIdx = selectedRooms.findIndex(function (r) { return String(r.id) === String(optId); });
+                if (existsIdx >= 0) {
+                    selectedRooms.splice(existsIdx, 1);
+                } else {
+                    selectedRooms.push({ id: optId, name: optName });
+                }
+                renderMultiRoomChips();
+                filterRooms(false);
+            } else {
+                roomId.value = optId;
+                selectedRoomName = optName;
+                search.value = optName;
+                selectedRooms = [{ id: optId, name: optName }];
+                search.setCustomValidity('');
+                closeList();
+            }
         }
 
         search.addEventListener('focus', function () {
@@ -189,15 +308,22 @@
                 return opt.dataset.roomName.toLocaleLowerCase() === search.value.trim().toLocaleLowerCase();
             });
             if (match) {
-                roomId.value = match.dataset.roomId;
-                selectedRoomName = match.dataset.roomName;
-            } else {
+                if (!isMultiRoom) {
+                    roomId.value = match.dataset.roomId;
+                    selectedRoomName = match.dataset.roomName;
+                    selectedRooms = [{ id: match.dataset.roomId, name: match.dataset.roomName }];
+                }
+            } else if (!isMultiRoom) {
                 roomId.value = '';
+                selectedRooms = [];
             }
         });
         search.addEventListener('search', function () {
-            roomId.value = '';
-            selectedRoomName = '';
+            if (!isMultiRoom) {
+                roomId.value = '';
+                selectedRoomName = '';
+                selectedRooms = [];
+            }
             openList(true);
         });
 
@@ -245,7 +371,13 @@
             if (!picker.contains(event.target)) closeList();
         });
         document.getElementById('event-form').addEventListener('submit', function (event) {
-            if (!roomId.value) {
+            if (isMultiRoom) {
+                if (selectedRooms.length === 0) {
+                    event.preventDefault();
+                    search.setCustomValidity('Pilih minimal satu ruangan.');
+                    search.reportValidity();
+                }
+            } else if (!roomId.value) {
                 event.preventDefault();
                 search.setCustomValidity('Pilih ruangan dari daftar yang tersedia.');
                 search.reportValidity();
@@ -349,12 +481,105 @@
 
         // Inisialisasi tampilan awal
         updateMultiDayUI();
+
+        // ==========================================
+        // VALIDASI KETERSEDIAAN RUANGAN (TOMBOL DI DEKAT BATAL)
+        // ==========================================
+        var btnValidate = document.getElementById('btn-validate-rooms');
+        var availabilityAlert = document.getElementById('availability-alert');
+
+        btnValidate.addEventListener('click', function () {
+            // Ambil daftar ruangan
+            var roomIds = [];
+            if (isMultiRoom && selectedRooms.length > 0) {
+                roomIds = selectedRooms.map(function (r) { return r.id; });
+            } else if (roomId.value) {
+                roomIds = [roomId.value];
+            }
+
+            var sDate = eventDateInput.value;
+            var eDate = (isMultiDay && endDateInput.value) ? endDateInput.value : '';
+            var startTimeSelect = document.getElementById('start_time');
+            var endTimeSelect = document.getElementById('end_time');
+            var sTime = startTimeSelect ? startTimeSelect.value : '';
+            var eTime = endTimeSelect ? endTimeSelect.value : '';
+
+            if (sTime === 'free') {
+                var sFree = document.getElementById('start_time_free');
+                sTime = sFree ? sFree.value : '';
+            }
+            if (eTime === 'free') {
+                var eFree = document.getElementById('end_time_free');
+                eTime = eFree ? eFree.value : '';
+            }
+
+            if (roomIds.length === 0 || !sDate || !sTime || !eTime) {
+                availabilityAlert.style.display = 'block';
+                availabilityAlert.style.background = '#fef2f2';
+                availabilityAlert.style.border = '1px solid #fecaca';
+                availabilityAlert.style.color = '#991b1b';
+                availabilityAlert.innerHTML = '⚠️ <b>Perhatian:</b> Mohon pilih ruangan, tanggal, serta jam mulai dan selesai terlebih dahulu untuk melakukan validasi.';
+                return;
+            }
+
+            var originalBtnHtml = btnValidate.innerHTML;
+            btnValidate.disabled = true;
+            btnValidate.innerHTML = '⏳ Memeriksa ketersediaan...';
+
+            var params = new URLSearchParams({
+                room_ids: roomIds.join(','),
+                event_date: sDate,
+                start_time: sTime,
+                end_time: eTime
+            });
+            if (isMultiDay && eDate) {
+                params.append('end_date', eDate);
+            }
+
+            fetch('{{ route("events.check-availability") }}?' + params.toString(), {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                btnValidate.disabled = false;
+                btnValidate.innerHTML = originalBtnHtml;
+                availabilityAlert.style.display = 'block';
+
+                if (data.available === true) {
+                    availabilityAlert.style.background = '#f0fdf4';
+                    availabilityAlert.style.border = '1px solid #bbf7d0';
+                    availabilityAlert.style.color = '#166534';
+                    availabilityAlert.innerHTML = '✅ <b>Ketersediaan Terkonfirmasi:</b> ' + (data.message || 'Semua ruangan tersedia pada waktu yang dipilih.') + ' Silakan klik tombol <b>Ajukan</b> untuk melanjutkan.';
+                } else {
+                    availabilityAlert.style.background = '#fef2f2';
+                    availabilityAlert.style.border = '1px solid #fecaca';
+                    availabilityAlert.style.color = '#991b1b';
+                    availabilityAlert.innerHTML = '❌ <b>Bentrok Jadwal:</b> ' + (data.message || 'Ruangan sedang digunakan pada jadwal tersebut. Silakan pilih ruangan atau waktu lain.');
+                }
+            })
+            .catch(function (err) {
+                btnValidate.disabled = false;
+                btnValidate.innerHTML = originalBtnHtml;
+                availabilityAlert.style.display = 'block';
+                availabilityAlert.style.background = '#fef2f2';
+                availabilityAlert.style.border = '1px solid #fecaca';
+                availabilityAlert.style.color = '#991b1b';
+                availabilityAlert.innerHTML = '⚠️ Terjadi kesalahan saat memeriksa ketersediaan ruangan. Silakan coba lagi.';
+            });
+        });
     })();
 </script>
 @if($canUseFreeTime)
 <script>
     document.getElementById('event-form').addEventListener('submit', function (event) {
         var room = document.getElementById('room_search').value;
+        var multiChips = Array.from(document.querySelectorAll('#multi_room_chips span span'));
+        if (multiChips.length > 0) {
+            room = multiChips.map(function(s){ return s.textContent; }).join(', ');
+        }
         var title = document.getElementById('title').value.trim();
         var date = document.getElementById('event_date').value;
         var isRange = document.getElementById('booking_type').value === 'range';

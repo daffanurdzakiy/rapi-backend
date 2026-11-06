@@ -983,6 +983,118 @@ class EventSessionTimeTest extends TestCase
         ]);
     }
 
+    public function test_multi_room_and_multi_day_matrix_booking_creates_events(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $room1 = $this->room('Lab Komputer 1');
+        $room2 = $this->room('Lab Komputer 2');
+
+        $day1 = now()->addDays(2)->toDateString();
+        $day2 = now()->addDays(3)->toDateString();
+
+        // Admin books 2 rooms for 2 days
+        $this->actingAs($admin)
+            ->post(route('events.store'), [
+                'room_ids' => [$room1->id, $room2->id],
+                'title' => 'Ujian Nasional',
+                'dates' => [$day1, $day2],
+                'start_time' => '08:00',
+                'end_time' => '09:30',
+            ])
+            ->assertRedirect(route('events.index'))
+            ->assertSessionHas('success');
+
+        // Should create 4 events (2 rooms x 2 days)
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room1->id,
+            'title' => 'Ujian Nasional - Lab Komputer 1 (Hari 1/2)',
+            'event_date' => $day1.' 00:00:00',
+            'status' => 'Disetujui',
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room1->id,
+            'title' => 'Ujian Nasional - Lab Komputer 1 (Hari 2/2)',
+            'event_date' => $day2.' 00:00:00',
+            'status' => 'Disetujui',
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room2->id,
+            'title' => 'Ujian Nasional - Lab Komputer 2 (Hari 1/2)',
+            'event_date' => $day1.' 00:00:00',
+            'status' => 'Disetujui',
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room2->id,
+            'title' => 'Ujian Nasional - Lab Komputer 2 (Hari 2/2)',
+            'event_date' => $day2.' 00:00:00',
+            'status' => 'Disetujui',
+        ]);
+    }
+
+    public function test_web_and_api_check_availability_detects_conflicts_for_multi_room(): void
+    {
+        $teacher = $this->userWithRole('Guru');
+        $room1 = $this->room('Aula Utama');
+        $room2 = $this->room('Ruang Teori 1');
+
+        $bookingDate = now()->addDays(4)->toDateString();
+
+        // Create an approved booking on room 1
+        Event::create([
+            'user_id' => $teacher->id,
+            'room_id' => $room1->id,
+            'title' => 'Seminar Pendidikan',
+            'event_date' => $bookingDate,
+            'start_time' => '09:30',
+            'end_time' => '11:00',
+            'status' => 'Disetujui',
+        ]);
+
+        // 1. Web check-availability when conflict exists
+        $this->actingAs($teacher)
+            ->getJson(route('events.check-availability', [
+                'room_ids' => "{$room1->id},{$room2->id}",
+                'event_date' => $bookingDate,
+                'start_time' => '10:00',
+                'end_time' => '11:30',
+            ]))
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'available' => false,
+                'conflict' => true,
+                'conflict_room_name' => 'Aula Utama',
+            ]);
+
+        // 2. Web check-availability when available (no conflict on different time)
+        $this->actingAs($teacher)
+            ->getJson(route('events.check-availability', [
+                'room_ids' => "{$room1->id},{$room2->id}",
+                'event_date' => $bookingDate,
+                'start_time' => '13:15',
+                'end_time' => '14:45',
+            ]))
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'available' => true,
+                'conflict' => false,
+                'total_rooms' => 2,
+            ]);
+
+        // 3. API check-availability
+        $this->actingAs($teacher, 'sanctum')
+            ->getJson("/api/events/check-availability?room_ids={$room1->id},{$room2->id}&event_date={$bookingDate}&start_time=10:00&end_time=11:30")
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'available' => false,
+                    'room_name' => 'Aula Utama',
+                ],
+            ]);
+    }
+
     private function userWithRole(string $roleName): User
     {
         $roleId = DB::table('roles')->where('role_name', $roleName)->value('id')

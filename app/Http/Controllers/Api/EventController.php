@@ -98,7 +98,9 @@ class EventController extends ApiController
 
         // Validasi input pengajuan agenda
         $validator = Validator::make($request->all(), [
-            'room_id' => ['required', 'exists:rooms,id'],
+            'room_id' => ['required_without:room_ids', 'nullable', 'exists:rooms,id'],
+            'room_ids' => ['required_without:room_id', 'nullable', 'array', 'min:1'],
+            'room_ids.*' => ['integer', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
             'event_date' => ['required_without:dates', 'nullable', 'date', $minDateRule],
             'dates' => ['nullable', 'array', 'min:1', 'max:30'],
@@ -129,6 +131,9 @@ class EventController extends ApiController
                 },
             ],
         ], [
+            'room_id.required_without' => 'Ruangan wajib dipilih.',
+            'room_ids.required_without' => 'Pilih minimal satu ruangan.',
+            'room_ids.min' => 'Pilih minimal satu ruangan.',
             'event_date.after' => 'Tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
             'event_date.after_or_equal' => 'Tanggal peminjaman ruang tidak boleh sebelum hari ini.',
             'dates.*.after' => 'Setiap tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
@@ -143,6 +148,17 @@ class EventController extends ApiController
         }
 
         $data = $validator->validated();
+
+        $roomIds = [];
+        if ($request->has('room_ids') && is_array($request->input('room_ids')) && ! empty($request->input('room_ids'))) {
+            $roomIds = array_values(array_unique(array_filter(array_map('intval', $request->input('room_ids')))));
+        } elseif (! empty($data['room_id'])) {
+            $roomIds = [(int) $data['room_id']];
+        }
+
+        if (empty($roomIds)) {
+            return $this->sendError('Pilih minimal satu ruangan.', ['room_id' => ['Pilih minimal satu ruangan.']], 422);
+        }
 
         $dates = [];
         if ($request->has('dates') && is_array($request->input('dates')) && ! empty($request->input('dates'))) {
@@ -178,66 +194,96 @@ class EventController extends ApiController
             ], 422);
         }
 
-        // Mengecek apakah ruangan sudah dipakai pada setiap hari dalam rentang tanggal
-        foreach ($dates as $date) {
-            if ($this->hasConflict((int) $data['room_id'], $date->toDateString(), $data['start_time'], $data['end_time'])) {
-                $dateFormatted = $date->translatedFormat('d M Y');
-                return $this->sendError("Ruangan sudah digunakan pada tanggal {$dateFormatted} pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.", [
-                    'room_id' => ["Ruangan sudah dipesan pada tanggal {$dateFormatted}."],
-                ], 422);
+        // Mengecek apakah seluruh ruangan yang dipilih sudah dipakai pada setiap hari dalam rentang tanggal
+        $roomsById = Room::whereIn('id', $roomIds)->get()->keyBy('id');
+        foreach ($roomIds as $rId) {
+            $roomName = $roomsById[$rId]->room_name ?? "Ruang {$rId}";
+            foreach ($dates as $date) {
+                if ($this->hasConflict($rId, $date->toDateString(), $data['start_time'], $data['end_time'])) {
+                    $dateFormatted = $date->translatedFormat('d M Y');
+                    return $this->sendError("Ruangan {$roomName} sudah digunakan pada tanggal {$dateFormatted} pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.", [
+                        'room_id' => ["Ruangan {$roomName} sudah dipesan pada tanggal {$dateFormatted}."],
+                    ], 422);
+                }
             }
         }
 
         // Jika yang membuat adalah Admin, status otomatis 'Disetujui'. Jika Guru/Organisasi, status awal adalah 'Pending'.
         $totalDays = count($dates);
+        $totalRooms = count($roomIds);
         $status = $roleName === 'Admin' ? 'Disetujui' : 'Pending';
         $approvedBy = $roleName === 'Admin' ? $user->id : null;
         $createdEvents = [];
 
-        DB::transaction(function () use ($dates, $totalDays, $data, $user, $status, $approvedBy, &$createdEvents) {
-            foreach ($dates as $index => $date) {
-                $dayNum = $index + 1;
-                $title = $totalDays > 1
-                    ? "{$data['title']} (Hari {$dayNum}/{$totalDays})"
-                    : $data['title'];
+        DB::transaction(function () use ($roomIds, $roomsById, $dates, $totalDays, $totalRooms, $data, $user, $status, $approvedBy, &$createdEvents) {
+            foreach ($roomIds as $rId) {
+                $roomName = $roomsById[$rId]->room_name ?? "Ruang {$rId}";
+                foreach ($dates as $index => $date) {
+                    $dayNum = $index + 1;
+                    if ($totalRooms > 1 && $totalDays > 1) {
+                        $title = "{$data['title']} - {$roomName} (Hari {$dayNum}/{$totalDays})";
+                    } elseif ($totalRooms > 1) {
+                        $title = "{$data['title']} - {$roomName}";
+                    } elseif ($totalDays > 1) {
+                        $title = "{$data['title']} (Hari {$dayNum}/{$totalDays})";
+                    } else {
+                        $title = $data['title'];
+                    }
 
-                $createdEvents[] = Event::create([
-                    'user_id' => $user->id,
-                    'room_id' => $data['room_id'],
-                    'title' => $title,
-                    'event_date' => $date->toDateString(),
-                    'start_time' => $data['start_time'],
-                    'end_time' => $data['end_time'],
-                    'status' => $status,
-                    'approved_by' => $approvedBy,
-                ]);
+                    $createdEvents[] = Event::create([
+                        'user_id' => $user->id,
+                        'room_id' => $rId,
+                        'title' => $title,
+                        'event_date' => $date->toDateString(),
+                        'start_time' => $data['start_time'],
+                        'end_time' => $data['end_time'],
+                        'status' => $status,
+                        'approved_by' => $approvedBy,
+                    ]);
+                }
             }
         });
 
-        // If submitted by Guru/Organisasi, optionally notify the room's PIC
-        // Kirim notifikasi ke PIC ruangan bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
+        // If submitted by Guru/Organisasi, optionally notify each room's PIC
+        // Kirim notifikasi ke PIC masing-masing ruangan bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
         $firstDate = $dates[0];
         $lastDate = $dates[count($dates) - 1];
         if ($status === 'Pending') {
-            $room = Room::find($data['room_id']);
-            if ($room && $room->pic_id) {
-                $firstEvent = $createdEvents[0] ?? null;
-                $dateSummary = $totalDays > 1
-                    ? "{$firstDate->translatedFormat('d M')} s/d {$lastDate->translatedFormat('d M Y')} ({$totalDays} hari)"
-                    : $firstDate->translatedFormat('d M Y');
+            $dateSummary = $totalDays > 1
+                ? "{$firstDate->translatedFormat('d M')} s/d {$lastDate->translatedFormat('d M Y')} ({$totalDays} hari)"
+                : $firstDate->translatedFormat('d M Y');
 
-                Notification::create([
-                    'event_id' => $firstEvent?->id,
-                    'user_id' => $room->pic_id,
-                    'message' => "Pengajuan peminjaman ruangan {$room->room_name} baru dari {$user->name} untuk {$dateSummary}: {$data['title']}.",
-                ]);
+            foreach ($roomIds as $rId) {
+                $room = $roomsById[$rId] ?? null;
+                if ($room && $room->pic_id) {
+                    $firstRoomEvent = collect($createdEvents)->firstWhere('room_id', $rId);
+                    Notification::create([
+                        'event_id' => $firstRoomEvent?->id,
+                        'user_id' => $room->pic_id,
+                        'message' => "Pengajuan peminjaman ruangan {$room->room_name} baru dari {$user->name} untuk {$dateSummary}: {$data['title']}.",
+                    ]);
+                }
             }
         }
 
         $firstEvent = $createdEvents[0];
-        $message = $roleName === 'Admin'
-            ? ($totalDays > 1 ? "Agenda {$totalDays} hari berhasil dibuat dan langsung disetujui." : 'Agenda berhasil dibuat dan langsung disetujui.')
-            : ($totalDays > 1 ? "Agenda {$totalDays} hari berhasil diajukan dan menunggu persetujuan PIC." : 'Agenda berhasil diajukan dan menunggu persetujuan PIC.');
+        if ($roleName === 'Admin') {
+            $message = ($totalRooms > 1 && $totalDays > 1)
+                ? "Agenda {$totalRooms} ruangan selama {$totalDays} hari berhasil dibuat dan langsung disetujui."
+                : (($totalRooms > 1)
+                    ? "Agenda {$totalRooms} ruangan berhasil dibuat dan langsung disetujui."
+                    : (($totalDays > 1)
+                        ? "Agenda {$totalDays} hari berhasil dibuat dan langsung disetujui."
+                        : 'Agenda berhasil dibuat dan langsung disetujui.'));
+        } else {
+            $message = ($totalRooms > 1 && $totalDays > 1)
+                ? "Agenda {$totalRooms} ruangan selama {$totalDays} hari berhasil diajukan dan menunggu persetujuan PIC."
+                : (($totalRooms > 1)
+                    ? "Agenda {$totalRooms} ruangan berhasil diajukan dan menunggu persetujuan PIC."
+                    : (($totalDays > 1)
+                        ? "Agenda {$totalDays} hari berhasil diajukan dan menunggu persetujuan PIC."
+                        : 'Agenda berhasil diajukan dan menunggu persetujuan PIC.'));
+        }
 
         return $this->sendResponse(
             new EventResource($firstEvent->load(['room.pic', 'user'])),
@@ -349,14 +395,15 @@ class EventController extends ApiController
     }
 
     /**
-     * Check if a room is available for the given date and time range.
+     * Check if one or multiple rooms are available for the given date(s) and time range.
      */
     // Endpoint: GET /api/events/check-availability
-    // Mengecek secara real-time apakah suatu ruangan kosong (available) pada tanggal dan rentang jam tertentu
+    // Mengecek secara real-time apakah suatu atau seluruh ruangan kosong (available) pada tanggal dan rentang jam tertentu
     public function checkAvailability(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'room_id' => ['required', 'exists:rooms,id'],
+            'room_id' => ['nullable'],
+            'room_ids' => ['nullable'],
             'event_date' => ['nullable', 'date'],
             'dates' => ['nullable'],
             'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
@@ -370,6 +417,20 @@ class EventController extends ApiController
         }
 
         $data = $validator->validated();
+
+        $roomIds = [];
+        if ($request->filled('room_ids')) {
+            $raw = is_array($request->input('room_ids'))
+                ? $request->input('room_ids')
+                : explode(',', (string) $request->input('room_ids'));
+            $roomIds = array_values(array_unique(array_filter(array_map('intval', $raw))));
+        } elseif ($request->filled('room_id')) {
+            $roomIds = [(int) $request->input('room_id')];
+        }
+
+        if (empty($roomIds)) {
+            return $this->sendError('Ruangan harus dipilih.', null, 422);
+        }
 
         $dates = [];
         if ($request->filled('dates')) {
@@ -398,30 +459,39 @@ class EventController extends ApiController
             return $this->sendError('Tanggal kegiatan harus disertakan.', null, 422);
         }
 
+        $roomsById = Room::whereIn('id', $roomIds)->get()->keyBy('id');
+        $conflictRoom = null;
         $conflictDate = null;
-        foreach ($dates as $d) {
-            if ($this->hasConflict(
-                (int) $data['room_id'],
-                $d->toDateString(),
-                $data['start_time'],
-                $data['end_time'],
-                isset($data['ignore_event_id']) ? (int) $data['ignore_event_id'] : null,
-            )) {
-                $conflictDate = $d;
-                break;
+        $ignoreId = isset($data['ignore_event_id']) ? (int) $data['ignore_event_id'] : null;
+
+        foreach ($roomIds as $rId) {
+            foreach ($dates as $d) {
+                if ($this->hasConflict(
+                    $rId,
+                    $d->toDateString(),
+                    $data['start_time'],
+                    $data['end_time'],
+                    $ignoreId
+                )) {
+                    $conflictRoom = $roomsById[$rId] ?? Room::find($rId);
+                    $conflictDate = $d;
+                    break 2;
+                }
             }
         }
 
         $totalDays = count($dates);
+        $totalRooms = count($roomIds);
         $primaryDate = $data['event_date'] ?? ($dates[0] ?? null)?->toDateString();
-        if ($conflictDate !== null) {
-            $msg = $totalDays > 1
-                ? "Ruangan tidak tersedia pada tanggal {$conflictDate->translatedFormat('d M Y')}."
+        if ($conflictDate !== null && $conflictRoom !== null) {
+            $msg = ($totalRooms > 1 || $totalDays > 1)
+                ? "Ruangan {$conflictRoom->room_name} tidak tersedia pada tanggal {$conflictDate->translatedFormat('d M Y')}."
                 : 'Ruangan tidak tersedia pada waktu tersebut.';
 
             return $this->sendResponse([
                 'available' => false,
-                'room_id' => (int) $data['room_id'],
+                'room_id' => $conflictRoom->id,
+                'room_name' => $conflictRoom->room_name,
                 'event_date' => $primaryDate,
                 'end_date' => $data['end_date'] ?? null,
                 'conflict_date' => $conflictDate->toDateString(),
@@ -431,13 +501,19 @@ class EventController extends ApiController
             ]);
         }
 
-        $successMsg = $totalDays > 1
-            ? "Ruangan tersedia untuk seluruh {$totalDays} tanggal yang dipilih."
-            : 'Ruangan tersedia.';
+        $successMsg = ($totalRooms > 1 && $totalDays > 1)
+            ? "Semua {$totalRooms} ruangan tersedia untuk seluruh {$totalDays} tanggal yang dipilih."
+            : (($totalRooms > 1)
+                ? "Semua {$totalRooms} ruangan tersedia."
+                : (($totalDays > 1)
+                    ? "Ruangan tersedia untuk seluruh {$totalDays} tanggal yang dipilih."
+                    : 'Ruangan tersedia.'));
 
         return $this->sendResponse([
             'available' => true,
-            'room_id' => (int) $data['room_id'],
+            'room_id' => $roomIds[0],
+            'room_ids' => $roomIds,
+            'total_rooms' => $totalRooms,
             'event_date' => $primaryDate,
             'end_date' => $data['end_date'] ?? null,
             'total_days' => $totalDays,

@@ -51,6 +51,7 @@ Route::middleware('auth')->group(function () {
     // Fitur Agenda / Peminjaman Ruangan (Lihat daftar, form pengajuan, dan simpan pengajuan baru)
     Route::get('/agenda', [EventController::class, 'index'])->name('events.index');
     Route::get('/agenda/ajukan', [EventController::class, 'create'])->name('events.create');
+    Route::get('/agenda/cek-ketersediaan', [EventController::class, 'checkAvailability'])->name('events.check-availability');
     Route::post('/agenda', [EventController::class, 'store'])->name('events.store');
 
     // Fitur Pengaduan Sarana & Prasarana (Lihat daftar dan tampilkan foto bukti kerusakan)
