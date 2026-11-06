@@ -272,6 +272,41 @@ class PicAssignedRoomsAgendaTest extends TestCase
         $this->delete(route('events.destroy', $approvedEvent))->assertForbidden();
     }
 
+    public function test_admin_dashboard_shows_recent_complaints_and_actions_under_date_without_aksi_cepat(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $pic = $this->userWithRole('PIC');
+        $reporter = $this->userWithRole('Guru');
+        $room = $this->roomFor($pic, 'Ruang Multimedia');
+
+        $olderComplaint = Complaint::create([
+            'room_id' => $room->id,
+            'reporter_id' => $reporter->id,
+            'description' => 'Kerusakan Lama AC',
+            'status_repair' => 'Belum Diperbaiki',
+        ]);
+        $newerComplaint = Complaint::create([
+            'room_id' => $room->id,
+            'reporter_id' => $reporter->id,
+            'description' => 'Kerusakan Baru Proyektor',
+            'status_repair' => 'Menunggu Spare Part',
+        ]);
+
+        DB::table('complaints')->where('id', $olderComplaint->id)->update(['created_at' => now()->subHours(5)]);
+        DB::table('complaints')->where('id', $newerComplaint->id)->update(['created_at' => now()->subMinutes(10)]);
+
+        $response = $this->actingAs($admin)->get(route('dashboard'));
+        $response->assertOk()
+            ->assertDontSee('Aksi Cepat')
+            ->assertSee('Laporan Kerusakan Terbaru')
+            ->assertSee('＋ Ajukan agenda')
+            ->assertSee('＋ Tambah ruangan')
+            ->assertSeeInOrder([
+                'Kerusakan Baru Proyektor',
+                'Kerusakan Lama AC',
+            ]);
+    }
+
     private function userWithRole(string $roleName): User
     {
         $roleId = DB::table('roles')->insertGetId([

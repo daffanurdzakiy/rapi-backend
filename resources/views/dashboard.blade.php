@@ -1,6 +1,9 @@
 @extends('layouts.app')
 @section('content')
-@php($featuredRoomSchedules = $featuredRoomSchedules ?? collect())
+@php
+    $featuredRoomSchedules = $featuredRoomSchedules ?? collect();
+    $complaintsList = $recentComplaints ?? collect();
+@endphp
 <style>
     .dashboard-page {
         --dashboard-navy: #35465e;
@@ -202,14 +205,76 @@
         color: #34445d;
     }
     .dashboard-page .notice a { color: #465a73; }
+    .dashboard-header-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+    }
+    .dashboard-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    .quick-action-btn {
+        min-height: 36px;
+        padding: 0 14px;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .badge-status-repaired {
+        background: #dcfce7 !important;
+        border-color: #86efac !important;
+        color: #166534 !important;
+        font-weight: 700;
+    }
+    .badge-status-waiting {
+        background: #fef3c7 !important;
+        border-color: #fde68a !important;
+        color: #92400e !important;
+        font-weight: 700;
+    }
+    .badge-status-pending {
+        background: #fee2e2 !important;
+        border-color: #fca5a5 !important;
+        color: #991b1b !important;
+        font-weight: 700;
+    }
     @media (max-width: 760px) {
         .dashboard-page { padding: 16px; }
         .dashboard-page .stat-value { font-size: 56px !important; }
         .dashboard-page .room-schedules { grid-template-columns: 1fr; }
+        .dashboard-header-right {
+            align-items: flex-start;
+            width: 100%;
+        }
+        .dashboard-header-actions {
+            justify-content: flex-start;
+            width: 100%;
+        }
     }
 </style>
 <div class="dashboard-page">
-<div class="heading dashboard-heading"><div><h1>Selamat datang, {{ auth()->user()->name }}!</h1><p>Ringkasan aktivitas dan infrastruktur sekolah hari ini.</p></div><b class="dashboard-date">{{ now()->locale('id')->translatedFormat('l, d F Y') }}</b></div>
+<div class="heading dashboard-heading">
+    <div>
+        <h1>Selamat datang, {{ auth()->user()->name }}!</h1>
+        <p>Ringkasan aktivitas dan infrastruktur sekolah hari ini.</p>
+    </div>
+    <div class="dashboard-header-right">
+        <b class="dashboard-date">{{ now()->locale('id')->translatedFormat('l, d F Y') }}</b>
+        <div class="dashboard-header-actions">
+            @if(in_array(auth()->user()->role?->role_name, ['Admin', 'Guru', 'Organisasi']))
+                <a class="btn quick-action-btn" href="{{ route('events.create') }}">＋ Ajukan agenda</a>
+            @endif
+            @if(auth()->user()->role?->role_name === 'Admin')
+                <a class="btn ghost quick-action-btn" href="{{ route('rooms.create') }}">＋ Tambah ruangan</a>
+            @endif
+        </div>
+    </div>
+</div>
 <div class="stats"><div class="card stat stat-room"><span class="muted">{{ auth()->user()->role?->role_name === 'PIC' ? 'RUANGAN TANGGUNG JAWAB' : 'TOTAL RUANGAN' }}</span><b class="stat-value">{{ $roomCount }}</b><span class="muted">{{ auth()->user()->role?->role_name === 'PIC' ? 'Ruangan yang ditugaskan kepada Anda' : 'Ruang terdaftar' }}</span></div><div class="card stat stat-agenda"><span class="muted">AGENDA HARI INI</span><b class="stat-value">{{ $todayEvents }}</b><span class="muted">Jumlah agenda pada hari ini</span></div><div class="card stat stat-pending"><span class="muted">ADUAN PENDING</span><b class="stat-value">{{ $pendingComplaints }}</b><span class="muted">Perlu tindak lanjut PIC</span></div></div>
 <section class="room-schedules" aria-label="Jadwal ruangan hari ini">
     @foreach($featuredRoomSchedules as $roomSchedule)
@@ -271,16 +336,32 @@
                 <p class="muted">Belum ada ruangan yang ditugaskan kepada Anda.</p>
             @endforelse
         @else
-            <h2>Aksi Cepat</h2>
-            @if(in_array(auth()->user()->role?->role_name, ['Admin', 'Guru', 'Organisasi']))
-                <p><a class="btn quick-action" href="{{ route('events.create') }}">＋ Ajukan agenda</a></p>
-            @endif
-            @if(auth()->user()->role?->role_name === 'Admin')
-                <p><a class="btn ghost quick-action" href="{{ route('rooms.create') }}">＋ Tambah ruangan</a></p>
-            @endif
+            <div class="heading">
+                <h2>Laporan Kerusakan Terbaru</h2>
+                <a href="{{ route('complaints.index') }}">Lihat semua</a>
+            </div>
+            @forelse($complaintsList as $complaint)
+                @php
+                    $badgeClass = match($complaint->status_repair) {
+                        'Sudah Diperbaiki' => 'badge-status-repaired',
+                        'Menunggu Spare Part' => 'badge-status-waiting',
+                        default => 'badge-status-pending',
+                    };
+                @endphp
+                <div class="list">
+                    <span class="badge {{ $badgeClass }}" style="float:right; margin-left:8px;">{{ $complaint->status_repair }}</span>
+                    <b>{{ $complaint->room->room_name }}</b><br>
+                    <span style="font-size:13px; color:#26364a; font-weight:500;">{{ \Illuminate\Support\Str::limit($complaint->description, 70) }}</span><br>
+                    <span class="muted" style="font-size:12px;">
+                        Pelapor: <b>{{ $complaint->reporter->name }}</b> · {{ $complaint->created_at->locale('id')->translatedFormat('d M Y, H:i') }}
+                    </span>
+                </div>
+            @empty
+                <p class="muted">Belum ada laporan kerusakan.</p>
+            @endforelse
         @endif
-        @if(auth()->user()->role?->role_name === 'Admin' && $notifications->isNotEmpty())
-            <h3>Notifikasi</h3>
+        @if(auth()->user()->role?->role_name === 'Admin' && isset($notifications) && $notifications->isNotEmpty())
+            <h3 style="margin-top:20px;">Notifikasi</h3>
             @foreach($notifications as $notice)
                 <div class="notice">
                     @if($notice->complaint)

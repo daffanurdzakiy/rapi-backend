@@ -59,6 +59,16 @@ class DashboardController extends Controller
             ->reject(fn ($event) => $event->isCompletedExpired())
             ->take(5);
 
+        // Mengambil 5 laporan kerusakan fasilitas terbaru (diurutkan dari yang terbaru ke terlama).
+        $recentComplaints = Complaint::with(['room', 'reporter'])
+            ->when(
+                $role === 'PIC',
+                fn ($query) => $query->whereHas('room', fn ($roomQuery) => $roomQuery->where('pic_id', $user->id)),
+            )
+            ->latest('created_at')
+            ->take(5)
+            ->get();
+
         $featuredRoomSchedules = collect(['Wijaya', 'Dak'])->mapWithKeys(function (string $roomName) {
             $room = Room::query()
                 ->where('room_name', 'like', "%{$roomName}%")
@@ -82,6 +92,7 @@ class DashboardController extends Controller
             'todayEvents' => Event::whereDate('event_date', today())->count(),
             'pendingComplaints' => (clone $complaints)->where('status_repair', 'Belum Diperbaiki')->count(),
             'recentEvents' => $recentEvents,
+            'recentComplaints' => $recentComplaints,
             'notifications' => $notifications,
         ]);
     }
