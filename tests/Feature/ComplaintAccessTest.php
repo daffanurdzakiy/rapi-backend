@@ -222,7 +222,7 @@ class ComplaintAccessTest extends TestCase
                 'src="'.$photoUrl.'"',
             ], false)
             ->assertSee('href="'.$photoUrl.'"', false)
-            ->assertDontSee('Buat Pengaduan');
+            ->assertSee('Buat Pengaduan');
 
         $this->get(route('complaints.show-photo', $complaint))
             ->assertOk()
@@ -363,7 +363,9 @@ class ComplaintAccessTest extends TestCase
 
         $this->actingAs($organization)
             ->get(route('complaints.create'))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('Batal')
+            ->assertSee('Kirim Pengaduan');
 
         $this->post(route('complaints.store'), [
             'room_id' => $room->id,

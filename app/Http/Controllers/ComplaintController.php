@@ -146,7 +146,7 @@ class ComplaintController extends Controller
 
         return view('complaints.index', [
             'complaints' => $complaints,
-            'canReport' => in_array($role, ['Guru', 'Organisasi']),
+            'canReport' => in_array($role, ['Admin', 'Guru', 'Organisasi']),
             'whatsappWarnings' => $whatsappWarnings,
             'counts' => $counts,
             'currentFilter' => $currentStatus,

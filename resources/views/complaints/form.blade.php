@@ -41,11 +41,9 @@
     <img id="photo-preview" alt="Pratinjau foto bukti" hidden style="display:block;max-width:320px;max-height:240px;object-fit:contain;border-radius:8px;margin-top:12px">
     <p id="camera-error" class="error" role="alert" hidden></p>
 
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:20px">
         <button class="btn" type="submit">Kirim Pengaduan</button>
-        @if(auth()->user()->role?->role_name === 'Admin')
-            <a class="btn ghost" href="{{ route('complaints.index') }}">Batal</a>
-        @endif
+        <a class="btn ghost" href="{{ route('complaints.index') }}">Batal</a>
     </div>
 </form>
 
