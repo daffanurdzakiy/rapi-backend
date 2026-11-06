@@ -99,14 +99,15 @@ class EventController extends Controller
     {
         $roleName = $request->user()->role?->role_name;
         abort_unless(in_array($roleName, ['Admin', 'Guru', 'Organisasi']), 403);
+        $isAdmin = $roleName === 'Admin';
 
         return view('events.form', [
             'rooms' => Room::orderBy('room_name')->get(),
             'sessions' => $this->regularSessions(),
-            // Aturan H-1 (paling cepat meminjam untuk hari besok / Carbon::tomorrow()).
-            'firstBookingDate' => Carbon::tomorrow()->toDateString(),
-            // Hanya Admin yang diizinkan memilih waktu bebas di atas pukul 17:00.
-            'canUseFreeTime' => $roleName === 'Admin',
+            // Khusus Admin dapat meminjam mulai hari ini (hari H). Guru dan Organisasi mulai H-1 (besok).
+            'firstBookingDate' => $isAdmin ? Carbon::today()->toDateString() : Carbon::tomorrow()->toDateString(),
+            'canUseFreeTime' => $isAdmin,
+            'isAdmin' => $isAdmin,
         ]);
     }
 
@@ -383,13 +384,15 @@ class EventController extends Controller
     {
         $this->useFreeTimeInputs($request);
         $sessionTimes = $this->regularSessionTimes();
-        $canUseFreeTime = $request->user()->role?->role_name === 'Admin';
+        $isAdmin = $request->user()->role?->role_name === 'Admin';
+        $canUseFreeTime = $isAdmin;
+        $minDateRule = $isAdmin ? 'after_or_equal:today' : 'after:today';
 
         $data = $request->validate([
             'room_id' => ['required', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
             'booking_type' => ['nullable', 'in:single,range'],
-            'event_date' => ['required', 'date', 'after:today'],
+            'event_date' => ['required', 'date', $minDateRule],
             'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
             'start_time' => [
                 'required',
@@ -416,6 +419,7 @@ class EventController extends Controller
             ],
         ], [
             'event_date.after' => 'Tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
+            'event_date.after_or_equal' => 'Tanggal peminjaman ruang tidak boleh sebelum hari ini.',
             'end_date.after_or_equal' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
             'end_time.after' => 'Jam selesai harus setelah jam mulai.',
         ]);

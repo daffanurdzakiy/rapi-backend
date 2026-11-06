@@ -52,7 +52,34 @@ class EventSessionTimeTest extends TestCase
             ->assertSee('window.confirm', false)
             ->assertSee('Kirim pengajuan agenda ini?', false)
             ->assertSee('Ruangan: ', false)
-            ->assertSee($room->room_name);
+            ->assertSee($room->room_name)
+            ->assertDontSee('Peminjaman ruang hanya dapat diajukan mulai H-1 (besok) dan seterusnya.')
+            ->assertSee('min="'.now()->toDateString().'"', false);
+    }
+
+    public function test_admin_can_book_room_on_today_hari_h(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $room = $this->room();
+
+        $this->actingAs($admin)
+            ->post(route('events.store'), [
+                'room_id' => $room->id,
+                'title' => 'Agenda Hari H Admin',
+                'event_date' => now()->toDateString(),
+                'start_time' => '09:30',
+                'end_time' => '10:15',
+            ])
+            ->assertRedirect(route('events.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('events', [
+            'user_id' => $admin->id,
+            'room_id' => $room->id,
+            'title' => 'Agenda Hari H Admin',
+            'event_date' => now()->toDateString().' 00:00:00',
+            'status' => 'Disetujui',
+        ]);
     }
 
     public function test_room_booking_rejects_dates_before_tomorrow(): void

@@ -94,16 +94,13 @@ class EventController extends ApiController
         // Ambil daftar jam sesi reguler (Sesi 1-14, maksimal sampai 17:00). Hanya Admin yang boleh memilih jam bebas di atas 17:00.
         $sessionTimes = $this->regularSessionTimes();
         $canUseFreeTime = $roleName === 'Admin';
+        $minDateRule = $roleName === 'Admin' ? 'after_or_equal:today' : 'after:today';
 
         // Validasi input pengajuan agenda
-        // 
-        // - `'after:today'` mewajibkan peminjaman minimal H-1 (besok). Jika ingin mengizinkan peminjaman di hari yang sama (hari H),
-        //   ubah `'after:today'` menjadi `'after_or_equal:today'`.
-        // - Jika Guru/Organisasi diizinkan memilih jam bebas di luar sesi 1-14, ubah `$canUseFreeTime = true;` di atas.
         $validator = Validator::make($request->all(), [
             'room_id' => ['required', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
-            'event_date' => ['required', 'date', 'after:today'],
+            'event_date' => ['required', 'date', $minDateRule],
             'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
             'booking_type' => ['nullable', 'in:single,range'],
             'start_time' => [
@@ -131,6 +128,7 @@ class EventController extends ApiController
             ],
         ], [
             'event_date.after' => 'Tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
+            'event_date.after_or_equal' => 'Tanggal peminjaman ruang tidak boleh sebelum hari ini.',
             'end_date.after_or_equal' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
             'end_time.after' => 'Jam selesai harus setelah jam mulai.',
             'room_id.exists' => 'Ruangan yang dipilih tidak valid.',

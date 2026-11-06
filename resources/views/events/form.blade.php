@@ -67,7 +67,9 @@
             </div>
             <input type="hidden" name="booking_type" id="booking_type" value="{{ old('booking_type', old('end_date') ? 'range' : 'single') }}">
             <input id="event_date" type="date" name="event_date" value="{{ old('event_date') }}" min="{{ $firstBookingDate }}" required>
-            <p id="single_date_hint" class="muted">Peminjaman ruang hanya dapat diajukan mulai H-1 (besok) dan seterusnya.</p>
+            @if(!($isAdmin ?? (auth()->user()?->role?->role_name === 'Admin')))
+                <p id="single_date_hint" class="muted">Peminjaman ruang hanya dapat diajukan mulai H-1 (besok) dan seterusnya.</p>
+            @endif
             @error('event_date')<p class="error">{{ $message }}</p>@enderror
 
             {{-- Kolom Tanggal Selesai (Hanya muncul jika tombol peminjaman lebih dari 1 hari ditekan) --}}
@@ -275,7 +277,7 @@
                 endDateInput.disabled = false;
                 endDateInput.required = true;
                 multiDayInfo.style.display = 'block';
-                singleDateHint.style.display = 'none';
+                if (singleDateHint) singleDateHint.style.display = 'none';
                 bookingTypeInput.value = 'range';
 
                 if (eventDateInput.value) {
@@ -294,7 +296,7 @@
                 endDateInput.required = false;
                 endDateInput.value = '';
                 multiDayInfo.style.display = 'none';
-                singleDateHint.style.display = 'block';
+                if (singleDateHint) singleDateHint.style.display = 'block';
                 bookingTypeInput.value = 'single';
             }
             updateSummary();
