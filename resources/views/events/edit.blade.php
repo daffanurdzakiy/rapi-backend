@@ -223,7 +223,10 @@
             </div>
         </div>
 
-        <button id="submit_btn" class="btn" style="margin-top:20px">Simpan Perubahan</button>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:20px">
+            <button id="submit_btn" class="btn" type="submit">Simpan Perubahan</button>
+            <a class="btn ghost" href="{{ route('events.index') }}">Batal</a>
+        </div>
     </form>
 </div>
 
