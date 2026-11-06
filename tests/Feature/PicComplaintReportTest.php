@@ -117,6 +117,25 @@ class PicComplaintReportTest extends TestCase
             ->assertStreamedContent('foto-bukti');
     }
 
+    public function test_admin_can_also_view_evidence_photo(): void
+    {
+        Storage::fake('public');
+
+        $pic = $this->userWithRole('PIC');
+        $admin = $this->userWithRole('Admin');
+        $reporter = $this->userWithRole('Guru');
+        $room = $this->roomFor($pic, 'Ruang Bukti Admin');
+        $complaint = $this->complaintFor($room, $reporter, 'Foto bukti untuk admin', now()->toDateTimeString());
+        $complaint->update(['photo_path' => 'complaints/admin_evidence.jpg']);
+        Storage::disk('public')->put($complaint->photo_path, 'foto-bukti-admin');
+
+        $this->actingAs($admin)
+            ->get(route('pic.complaint-reports.photo', $complaint))
+            ->assertOk()
+            ->assertHeader('content-type', 'image/jpeg')
+            ->assertStreamedContent('foto-bukti-admin');
+    }
+
     public function test_pic_cannot_view_evidence_photo_from_another_pic_room(): void
     {
         Storage::fake('public');

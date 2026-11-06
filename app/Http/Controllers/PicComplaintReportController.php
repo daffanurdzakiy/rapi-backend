@@ -15,18 +15,30 @@ class PicComplaintReportController extends Controller
     // Menampilkan foto bukti pengaduan pada halaman laporan PIC.
     public function showPhoto(Request $request, Complaint $complaint): StreamedResponse
     {
-        abort_unless(
-            $request->user()->role?->role_name === 'PIC'
-                && $complaint->room()->where('pic_id', $request->user()->id)->exists(),
-            403,
-        );
+        $user = $request->user();
+        $role = $user->role?->role_name;
+
+        // Boleh dilihat oleh Admin atau PIC yang bertanggung jawab atas ruangan tersebut
+        $canView = $role === 'Admin'
+            || ($role === 'PIC' && $complaint->room()->where('pic_id', $user->id)->exists());
+
+        abort_unless($canView, 403);
         abort_unless($complaint->photo_path && Storage::disk('public')->exists($complaint->photo_path), 404);
 
         $disk = Storage::disk('public');
+        $mime = 'image/jpeg';
+        try {
+            $mime = $disk->mimeType($complaint->photo_path) ?: 'image/jpeg';
+        } catch (\Throwable $e) {
+            $mime = 'image/jpeg';
+        }
 
         return $disk->response(
             $complaint->photo_path,
-            headers: ['Content-Type' => $disk->mimeType($complaint->photo_path)],
+            headers: [
+                'Content-Type' => $mime,
+                'Cache-Control' => 'no-cache, private',
+            ],
             disposition: 'inline',
         );
     }

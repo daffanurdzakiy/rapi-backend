@@ -14,7 +14,7 @@
     @media print {
         @page { size:landscape; margin:14mm; }
         :root, body { background:#fff !important; color:#111 !important; }
-        .side, .top, .report-filter-card, .no-print, .success { display:none !important; }
+        .side, .top, .report-filter-card, .no-print, .success, #photo-modal { display:none !important; }
         .layout, .main, .content { display:block !important; width:100% !important; max-width:none !important; margin:0 !important; padding:0 !important; }
         .report-heading { margin-bottom:16px; }
         .report-heading h1 { font-size:22px; }
@@ -99,11 +99,51 @@
                         </td>
                         <td>{{ $complaint->reporter->name }}</td>
                         <td>{{ $complaint->status_repair }}</td>
-                        <td class="evidence-column">
+                        <td class="evidence-column" style="vertical-align:middle;">
                             @if($complaint->photo_path)
-                                <a href="{{ route('pic.complaint-reports.photo', $complaint, false) }}" target="_blank" rel="noopener">Lihat foto</a>
+                                @php($photoUrl = route('pic.complaint-reports.photo', $complaint, false))
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <button
+                                        type="button"
+                                        class="open-photo-modal"
+                                        data-photo-url="{{ $photoUrl }}"
+                                        data-room="{{ $complaint->room->room_name }}"
+                                        data-desc="{{ $complaint->description }}"
+                                        title="Klik untuk melihat foto lebih besar"
+                                        style="border:none; background:none; padding:0; cursor:pointer; display:block;"
+                                    >
+                                        <img
+                                            src="{{ $photoUrl }}"
+                                            alt="Foto bukti {{ $complaint->room->room_name }}"
+                                            style="width:50px; height:50px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:transform 0.15s ease;"
+                                            onmouseover="this.style.transform='scale(1.08)'"
+                                            onmouseout="this.style.transform='scale(1)'"
+                                        >
+                                    </button>
+                                    <div>
+                                        <button
+                                            type="button"
+                                            class="open-photo-modal"
+                                            data-photo-url="{{ $photoUrl }}"
+                                            data-room="{{ $complaint->room->room_name }}"
+                                            data-desc="{{ $complaint->description }}"
+                                            style="border:none; background:none; padding:0; font-size:12px; color:var(--accent, #1d4ed8); cursor:pointer; text-decoration:underline; font-weight:600; display:block; text-align:left;"
+                                        >
+                                            Lihat foto
+                                        </button>
+                                        <a
+                                            href="{{ $photoUrl }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                            style="font-size:11px; color:#64748b; text-decoration:none; display:inline-block; margin-top:2px;"
+                                            title="Buka foto ukuran penuh di tab baru"
+                                        >
+                                            Tab baru ↗
+                                        </a>
+                                    </div>
+                                </div>
                             @else
-                                <span class="muted">Tidak ada foto</span>
+                                <span class="muted" style="font-size:12px;">Tidak ada foto</span>
                             @endif
                         </td>
                     </tr>
@@ -114,5 +154,71 @@
         </table>
     </div>
 </div>
+
+{{-- Modal Pratinjau Foto Bukti Pengaduan Langsung di Layar --}}
+<div id="photo-modal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.7); z-index:9999; align-items:center; justify-content:center; padding:16px;" role="dialog" aria-modal="true" aria-labelledby="modal-room-title">
+    <div style="background:#fff; border-radius:12px; max-width:620px; width:100%; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);">
+        <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+            <div>
+                <h3 id="modal-room-title" style="margin:0; font-size:15px; font-weight:700; color:#1e293b;">Foto Bukti Pengaduan</h3>
+                <p id="modal-desc" style="margin:3px 0 0; font-size:12.5px; color:#64748b; line-height:1.4;"></p>
+            </div>
+            <button id="close-photo-modal" type="button" aria-label="Tutup pratinjau foto" style="background:none; border:none; font-size:22px; line-height:1; cursor:pointer; color:#64748b; padding:4px 8px; border-radius:6px;">✕</button>
+        </div>
+        <div style="padding:16px; display:flex; align-items:center; justify-content:center; background:#f8fafc; flex:1; min-height:260px; overflow:auto;">
+            <img id="modal-photo-img" src="" alt="Pratinjau foto bukti kerusakan fasilitas" style="max-width:100%; max-height:65vh; object-fit:contain; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">
+        </div>
+        <div style="padding:12px 18px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px; background:#fff;">
+            <a id="modal-open-tab" href="#" target="_blank" rel="noopener" class="btn ghost" style="font-size:12px; padding:6px 14px;">Buka di Tab Baru ↗</a>
+            <button id="modal-close-btn" type="button" class="btn" style="font-size:12px; padding:6px 14px;">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var modal = document.getElementById('photo-modal');
+        var modalImg = document.getElementById('modal-photo-img');
+        var modalTitle = document.getElementById('modal-room-title');
+        var modalDesc = document.getElementById('modal-desc');
+        var modalOpenTab = document.getElementById('modal-open-tab');
+        var closeBtn = document.getElementById('close-photo-modal');
+        var closeActionBtn = document.getElementById('modal-close-btn');
+
+        function closeModal() {
+            if (modal) {
+                modal.style.display = 'none';
+                if (modalImg) modalImg.src = '';
+            }
+        }
+
+        document.querySelectorAll('.open-photo-modal').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var url = this.getAttribute('data-photo-url');
+                var room = this.getAttribute('data-room');
+                var desc = this.getAttribute('data-desc');
+
+                if (modal && modalImg) {
+                    modalImg.src = url;
+                    if (modalTitle) modalTitle.textContent = 'Foto Bukti: ' + room;
+                    if (modalDesc) modalDesc.textContent = desc;
+                    if (modalOpenTab) modalOpenTab.href = url;
+                    modal.style.display = 'flex';
+                }
+            });
+        });
+
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (closeActionBtn) closeActionBtn.addEventListener('click', closeModal);
+        if (modal) {
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) closeModal();
+            });
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeModal();
+        });
+    })();
+</script>
 @endif
 @endsection

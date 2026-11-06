@@ -208,3 +208,4 @@ class CompressExistingComplaintPhotos extends Command
         return $encoded && is_string($content) ? $content : null;
     }
 }
+

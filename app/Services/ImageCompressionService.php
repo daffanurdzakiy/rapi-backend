@@ -181,3 +181,4 @@ class ImageCompressionService
         return $path;
     }
 }
+
