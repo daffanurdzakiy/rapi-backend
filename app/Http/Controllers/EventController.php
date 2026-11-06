@@ -120,26 +120,40 @@ class EventController extends Controller
 
         $data = $this->validateEvent($request);
 
-        // Menentukan rentang tanggal kegiatan (mendukung peminjaman 1 hari maupun multi-hari berturut-turut)
-        $startDate = Carbon::parse($data['event_date']);
-        $isRange = ($request->input('booking_type') === 'range' || ! empty($data['end_date']))
-            && ! empty($data['end_date'])
-            && $data['end_date'] > $data['event_date'];
-
-        $endDate = $isRange ? Carbon::parse($data['end_date']) : $startDate->copy();
-
-        if ($endDate->lt($startDate)) {
-            throw ValidationException::withMessages([
-                'end_date' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
-            ]);
-        }
-
-        // Himpun seluruh tanggal dalam rentang peminjaman
         $dates = [];
-        $current = $startDate->copy();
-        while ($current->lte($endDate)) {
-            $dates[] = $current->copy();
-            $current->addDay();
+        if ($request->has('dates') && is_array($request->input('dates')) && ! empty($request->input('dates'))) {
+            $parsedDates = collect($request->input('dates'))
+                ->map(fn ($d) => Carbon::parse($d))
+                ->sortBy(fn ($c) => $c->timestamp)
+                ->unique(fn ($c) => $c->toDateString())
+                ->values();
+            foreach ($parsedDates as $pd) {
+                $dates[] = $pd;
+            }
+            if (empty($data['event_date']) && ! empty($dates)) {
+                $data['event_date'] = $dates[0]->toDateString();
+            }
+        } else {
+            // Menentukan rentang tanggal kegiatan (mendukung peminjaman 1 hari maupun multi-hari berturut-turut)
+            $startDate = Carbon::parse($data['event_date']);
+            $isRange = ($request->input('booking_type') === 'range' || ! empty($data['end_date']))
+                && ! empty($data['end_date'])
+                && $data['end_date'] > $data['event_date'];
+
+            $endDate = $isRange ? Carbon::parse($data['end_date']) : $startDate->copy();
+
+            if ($endDate->lt($startDate)) {
+                throw ValidationException::withMessages([
+                    'end_date' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
+                ]);
+            }
+
+            // Himpun seluruh tanggal dalam rentang peminjaman
+            $current = $startDate->copy();
+            while ($current->lte($endDate)) {
+                $dates[] = $current->copy();
+                $current->addDay();
+            }
         }
 
         if (count($dates) > 30) {
@@ -184,13 +198,15 @@ class EventController extends Controller
         });
 
         // Kirimkan notifikasi ke PIC jika status masih 'Pending'
+        $firstDate = $dates[0];
+        $lastDate = $dates[count($dates) - 1];
         if ($status === 'Pending') {
             $room = Room::find($data['room_id']);
             if ($room && $room->pic_id) {
                 $firstEvent = $createdEvents[0] ?? null;
                 $dateSummary = $totalDays > 1
-                    ? "{$startDate->translatedFormat('d M')} s/d {$endDate->translatedFormat('d M Y')} ({$totalDays} hari)"
-                    : $startDate->translatedFormat('d M Y');
+                    ? "{$firstDate->translatedFormat('d M')} s/d {$lastDate->translatedFormat('d M Y')} ({$totalDays} hari)"
+                    : $firstDate->translatedFormat('d M Y');
 
                 Notification::create([
                     'event_id' => $firstEvent?->id,
@@ -206,7 +222,7 @@ class EventController extends Controller
                 : 'Agenda berhasil dibuat dan langsung disetujui.';
         } else {
             $message = $totalDays > 1
-                ? "Agenda berhasil diajukan untuk {$totalDays} hari ({$startDate->translatedFormat('d M')} - {$endDate->translatedFormat('d M Y')}) dan menunggu persetujuan PIC."
+                ? "Agenda berhasil diajukan untuk {$totalDays} hari ({$firstDate->translatedFormat('d M')} - {$lastDate->translatedFormat('d M Y')}) dan menunggu persetujuan PIC."
                 : 'Agenda berhasil diajukan dan menunggu persetujuan.';
         }
 
@@ -391,8 +407,10 @@ class EventController extends Controller
         $data = $request->validate([
             'room_id' => ['required', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
-            'booking_type' => ['nullable', 'in:single,range'],
-            'event_date' => ['required', 'date', $minDateRule],
+            'booking_type' => ['nullable', 'in:single,range,multi'],
+            'event_date' => ['required_without:dates', 'nullable', 'date', $minDateRule],
+            'dates' => ['nullable', 'array', 'min:1', 'max:30'],
+            'dates.*' => ['date', $minDateRule],
             'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
             'start_time' => [
                 'required',
@@ -420,6 +438,8 @@ class EventController extends Controller
         ], [
             'event_date.after' => 'Tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
             'event_date.after_or_equal' => 'Tanggal peminjaman ruang tidak boleh sebelum hari ini.',
+            'dates.*.after' => 'Setiap tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
+            'dates.*.after_or_equal' => 'Setiap tanggal peminjaman ruang tidak boleh sebelum hari ini.',
             'end_date.after_or_equal' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
             'end_time.after' => 'Jam selesai harus setelah jam mulai.',
         ]);

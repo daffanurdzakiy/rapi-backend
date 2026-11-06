@@ -100,9 +100,11 @@ class EventController extends ApiController
         $validator = Validator::make($request->all(), [
             'room_id' => ['required', 'exists:rooms,id'],
             'title' => ['required', 'string', 'max:255'],
-            'event_date' => ['required', 'date', $minDateRule],
+            'event_date' => ['required_without:dates', 'nullable', 'date', $minDateRule],
+            'dates' => ['nullable', 'array', 'min:1', 'max:30'],
+            'dates.*' => ['date', $minDateRule],
             'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
-            'booking_type' => ['nullable', 'in:single,range'],
+            'booking_type' => ['nullable', 'in:single,range,multi'],
             'start_time' => [
                 'required',
                 'date_format:H:i',
@@ -129,6 +131,8 @@ class EventController extends ApiController
         ], [
             'event_date.after' => 'Tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
             'event_date.after_or_equal' => 'Tanggal peminjaman ruang tidak boleh sebelum hari ini.',
+            'dates.*.after' => 'Setiap tanggal peminjaman ruang paling cepat besok (H-1) atau setelahnya.',
+            'dates.*.after_or_equal' => 'Setiap tanggal peminjaman ruang tidak boleh sebelum hari ini.',
             'end_date.after_or_equal' => 'Tanggal selesai harus sama atau setelah tanggal mulai.',
             'end_time.after' => 'Jam selesai harus setelah jam mulai.',
             'room_id.exists' => 'Ruangan yang dipilih tidak valid.',
@@ -140,18 +144,32 @@ class EventController extends ApiController
 
         $data = $validator->validated();
 
-        $startDate = Carbon::parse($data['event_date']);
-        $isRange = ($request->input('booking_type') === 'range' || ! empty($data['end_date']))
-            && ! empty($data['end_date'])
-            && $data['end_date'] > $data['event_date'];
-
-        $endDate = $isRange ? Carbon::parse($data['end_date']) : $startDate->copy();
-
         $dates = [];
-        $current = $startDate->copy();
-        while ($current->lte($endDate)) {
-            $dates[] = $current->copy();
-            $current->addDay();
+        if ($request->has('dates') && is_array($request->input('dates')) && ! empty($request->input('dates'))) {
+            $parsedDates = collect($request->input('dates'))
+                ->map(fn ($d) => Carbon::parse($d))
+                ->sortBy(fn ($c) => $c->timestamp)
+                ->unique(fn ($c) => $c->toDateString())
+                ->values();
+            foreach ($parsedDates as $pd) {
+                $dates[] = $pd;
+            }
+            if (empty($data['event_date']) && ! empty($dates)) {
+                $data['event_date'] = $dates[0]->toDateString();
+            }
+        } else {
+            $startDate = Carbon::parse($data['event_date']);
+            $isRange = ($request->input('booking_type') === 'range' || ! empty($data['end_date']))
+                && ! empty($data['end_date'])
+                && $data['end_date'] > $data['event_date'];
+
+            $endDate = $isRange ? Carbon::parse($data['end_date']) : $startDate->copy();
+
+            $current = $startDate->copy();
+            while ($current->lte($endDate)) {
+                $dates[] = $current->copy();
+                $current->addDay();
+            }
         }
 
         if (count($dates) > 30) {
@@ -198,13 +216,15 @@ class EventController extends ApiController
 
         // If submitted by Guru/Organisasi, optionally notify the room's PIC
         // Kirim notifikasi ke PIC ruangan bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
+        $firstDate = $dates[0];
+        $lastDate = $dates[count($dates) - 1];
         if ($status === 'Pending') {
             $room = Room::find($data['room_id']);
             if ($room && $room->pic_id) {
                 $firstEvent = $createdEvents[0] ?? null;
                 $dateSummary = $totalDays > 1
-                    ? "{$startDate->translatedFormat('d M')} s/d {$endDate->translatedFormat('d M Y')} ({$totalDays} hari)"
-                    : $startDate->translatedFormat('d M Y');
+                    ? "{$firstDate->translatedFormat('d M')} s/d {$lastDate->translatedFormat('d M Y')} ({$totalDays} hari)"
+                    : $firstDate->translatedFormat('d M Y');
 
                 Notification::create([
                     'event_id' => $firstEvent?->id,
@@ -337,7 +357,8 @@ class EventController extends ApiController
     {
         $validator = Validator::make($request->all(), [
             'room_id' => ['required', 'exists:rooms,id'],
-            'event_date' => ['required', 'date'],
+            'event_date' => ['nullable', 'date'],
+            'dates' => ['nullable'],
             'end_date' => ['nullable', 'date', 'after_or_equal:event_date'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
@@ -350,16 +371,31 @@ class EventController extends ApiController
 
         $data = $validator->validated();
 
-        $startDate = Carbon::parse($data['event_date']);
-        $endDate = ! empty($data['end_date']) && $data['end_date'] > $data['event_date']
-            ? Carbon::parse($data['end_date'])
-            : $startDate->copy();
-
         $dates = [];
-        $cur = $startDate->copy();
-        while ($cur->lte($endDate)) {
-            $dates[] = $cur->copy();
-            $cur->addDay();
+        if ($request->filled('dates')) {
+            $inputDates = is_array($request->input('dates'))
+                ? $request->input('dates')
+                : explode(',', (string) $request->input('dates'));
+            foreach ($inputDates as $d) {
+                $trimmed = trim($d);
+                if (! empty($trimmed)) {
+                    $dates[] = Carbon::parse($trimmed);
+                }
+            }
+            $dates = collect($dates)->unique(fn ($c) => $c->toDateString())->sortBy(fn ($c) => $c->timestamp)->values()->all();
+        } elseif (! empty($data['event_date'])) {
+            $startDate = Carbon::parse($data['event_date']);
+            $endDate = ! empty($data['end_date']) && $data['end_date'] > $data['event_date']
+                ? Carbon::parse($data['end_date'])
+                : $startDate->copy();
+
+            $cur = $startDate->copy();
+            while ($cur->lte($endDate)) {
+                $dates[] = $cur->copy();
+                $cur->addDay();
+            }
+        } else {
+            return $this->sendError('Tanggal kegiatan harus disertakan.', null, 422);
         }
 
         $conflictDate = null;
@@ -377,6 +413,7 @@ class EventController extends ApiController
         }
 
         $totalDays = count($dates);
+        $primaryDate = $data['event_date'] ?? ($dates[0] ?? null)?->toDateString();
         if ($conflictDate !== null) {
             $msg = $totalDays > 1
                 ? "Ruangan tidak tersedia pada tanggal {$conflictDate->translatedFormat('d M Y')}."
@@ -385,7 +422,7 @@ class EventController extends ApiController
             return $this->sendResponse([
                 'available' => false,
                 'room_id' => (int) $data['room_id'],
-                'event_date' => $data['event_date'],
+                'event_date' => $primaryDate,
                 'end_date' => $data['end_date'] ?? null,
                 'conflict_date' => $conflictDate->toDateString(),
                 'start_time' => $data['start_time'],
@@ -395,13 +432,13 @@ class EventController extends ApiController
         }
 
         $successMsg = $totalDays > 1
-            ? "Ruangan tersedia untuk {$totalDays} hari berturut-turut ({$startDate->translatedFormat('d M')} s/d {$endDate->translatedFormat('d M Y')})."
+            ? "Ruangan tersedia untuk seluruh {$totalDays} tanggal yang dipilih."
             : 'Ruangan tersedia.';
 
         return $this->sendResponse([
             'available' => true,
             'room_id' => (int) $data['room_id'],
-            'event_date' => $data['event_date'],
+            'event_date' => $primaryDate,
             'end_date' => $data['end_date'] ?? null,
             'total_days' => $totalDays,
             'start_time' => $data['start_time'],

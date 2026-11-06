@@ -907,6 +907,82 @@ class EventSessionTimeTest extends TestCase
         ]);
     }
 
+    public function test_multi_date_booking_with_custom_dates_array_via_web_and_api(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $guru = $this->userWithRole('Guru');
+        $room = $this->room('Lab Komputer 1');
+
+        $today = now()->toDateString();
+        $day2 = now()->addDays(2)->toDateString();
+        $day4 = now()->addDays(4)->toDateString();
+
+        // 1. Admin can book multiple specific dates starting today
+        $this->actingAs($admin)
+            ->post(route('events.store'), [
+                'room_id' => $room->id,
+                'title' => 'Pelatihan Olimpiade Admin',
+                'dates' => [$today, $day2, $day4],
+                'start_time' => '08:45',
+                'end_time' => '11:00',
+            ])
+            ->assertRedirect(route('events.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseCount('events', 3);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'title' => 'Pelatihan Olimpiade Admin (Hari 1/3)',
+            'event_date' => $today.' 00:00:00',
+            'status' => 'Disetujui',
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'title' => 'Pelatihan Olimpiade Admin (Hari 2/3)',
+            'event_date' => $day2.' 00:00:00',
+            'status' => 'Disetujui',
+        ]);
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'title' => 'Pelatihan Olimpiade Admin (Hari 3/3)',
+            'event_date' => $day4.' 00:00:00',
+            'status' => 'Disetujui',
+        ]);
+
+        // 2. Guru is rejected if any date in dates array is today (must be H-1)
+        $this->actingAs($guru, 'sanctum')
+            ->postJson('/api/events', [
+                'room_id' => $room->id,
+                'title' => 'Ekskul Guru Hari H Gagal',
+                'dates' => [$today, $day2],
+                'start_time' => '13:15',
+                'end_time' => '14:45',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['dates.0']);
+
+        // 3. Guru can book multiple specific dates starting tomorrow (H-1)
+        $future1 = now()->addDays(1)->toDateString();
+        $future3 = now()->addDays(3)->toDateString();
+        $this->actingAs($guru, 'sanctum')
+            ->postJson('/api/events', [
+                'room_id' => $room->id,
+                'title' => 'Ekskul Robotik Guru',
+                'dates' => [$future1, $future3],
+                'start_time' => '13:15',
+                'end_time' => '14:45',
+            ])
+            ->assertStatus(201)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('events', [
+            'room_id' => $room->id,
+            'title' => 'Ekskul Robotik Guru (Hari 1/2)',
+            'event_date' => $future1.' 00:00:00',
+            'status' => 'Pending',
+        ]);
+    }
+
     private function userWithRole(string $roleName): User
     {
         $roleId = DB::table('roles')->where('role_name', $roleName)->value('id')
