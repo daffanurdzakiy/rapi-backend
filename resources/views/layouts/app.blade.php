@@ -36,36 +36,165 @@
             top: 0;
             z-index: 20;
             display: flex;
-            min-height: 68px;
+            min-height: 76px;
             align-items: center;
-            gap: 20px;
-            padding: 0 clamp(12px, 1.7vw, 24px);
+            justify-content: space-between;
+            gap: 24px;
+            padding: 0 clamp(16px, 2.4vw, 36px);
             border-top: 4px solid #35465e;
-            border-bottom: 1px solid #e8e1d3;
-            background: rgba(255, 253, 248, .97);
-            box-shadow: 0 8px 24px rgba(38, 54, 74, .08);
-            backdrop-filter: blur(14px);
+            border-bottom: 1px solid #e2dbcb;
+            background: rgba(255, 253, 248, .98);
+            box-shadow: 0 4px 20px rgba(38, 54, 74, .06);
+            backdrop-filter: blur(16px);
         }
-        .brand { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; color: #26364a; font-family: Georgia, serif; font-size: 20px; font-weight: 700; text-decoration: none; }
-        .brand:hover { color: #35465e; }
-        .brand img { display: block; width: 30px; height: 30px; object-fit: contain; }
-        .nav { display: flex; flex: 1 1 auto; min-width: 0; align-items: stretch; justify-content: center; gap: clamp(2px, .35vw, 6px); overflow: visible; }
-        .nav a { position: relative; display: inline-flex; flex: 0 0 auto; min-width: 0; min-height: 64px; align-items: center; padding: 0 clamp(6px, .65vw, 10px); border-radius: 7px 7px 0 0; color: #667386; font-size: clamp(10px, .9vw, 12px); white-space: nowrap; text-decoration: none; transition: color .18s, background .18s; }
-        .nav a::after { position: absolute; right: 8px; bottom: 0; left: 8px; height: 3px; border-radius: 3px 3px 0 0; background: transparent; content: ""; }
-        .nav a:hover { color: #26364a; background: #f1f3f6; }
-        .nav a.active { background: #f1f3f6; color: #26364a; font-weight: 700; }
-        .nav a.active::after { background: var(--accent); }
-        .top-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
-        .profile-link { display: inline-flex; min-width: 0; align-items: center; gap: 9px; border-radius: 9px; color: #26364a; text-decoration: none; }
-        .profile-link:hover { color: #35465e; }
-        .profile-avatar { display: grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; border: 1px solid #d7deea; border-radius: 50%; background: #f1f3f6; color: #35465e; font-size: 13px; font-weight: 700; transition: background .18s, border-color .18s, transform .18s; }
-        .profile-link:hover .profile-avatar { transform: translateY(-1px); border-color: #bdc9da; background: #e8edf4; }
-        .profile { max-width: 118px; overflow: hidden; color: #26364a; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-        .profile small { display: block; margin-top: 3px; color: #6d7788; font-size: 11px; font-weight: 400; }
-        .logout { margin: 0 0 0 7px; }
-        .logout button { display: grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #667386; cursor: pointer; transition: background .18s, color .18s; }
-        .logout button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
-        .logout button:hover { background: #e8edf4; color: #26364a; }
+        .brand {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 12px;
+            color: #26364a;
+            font-family: Inter, system-ui, -apple-system, sans-serif;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: .02em;
+            text-decoration: none;
+            transition: transform .18s ease, color .18s ease;
+        }
+        .brand:hover {
+            color: #35465e;
+            transform: translateY(-1px);
+        }
+        .brand img {
+            display: block;
+            width: 38px;
+            height: 38px;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 5px rgba(38, 54, 74, .12));
+        }
+        .nav {
+            display: flex;
+            flex: 1 1 auto;
+            min-width: 0;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(4px, .6vw, 10px);
+            overflow: visible;
+        }
+        .nav a {
+            position: relative;
+            display: inline-flex;
+            flex: 0 0 auto;
+            min-width: 0;
+            min-height: 44px;
+            align-items: center;
+            padding: 0 clamp(10px, 1vw, 16px);
+            border-radius: 9px;
+            color: #55657b;
+            font-size: clamp(13px, .92vw, 14.5px);
+            font-weight: 600;
+            white-space: nowrap;
+            text-decoration: none;
+            transition: color .18s, background .18s, transform .18s;
+        }
+        .nav a:hover {
+            color: #1e293b;
+            background: #eef2f7;
+        }
+        .nav a.active {
+            background: #e5ebf3;
+            color: #1e293b;
+            font-weight: 700;
+            box-shadow: inset 0 -2.5px 0 0 var(--accent);
+        }
+        .top-actions {
+            display: flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 12px;
+        }
+        .profile-link {
+            display: inline-flex;
+            min-width: 0;
+            align-items: center;
+            gap: 11px;
+            padding: 6px 10px;
+            border-radius: 12px;
+            color: #26364a;
+            text-decoration: none;
+            transition: background .18s, transform .18s;
+        }
+        .profile-link:hover {
+            color: #35465e;
+            background: rgba(53, 70, 94, .06);
+            transform: translateY(-1px);
+        }
+        .profile-avatar {
+            display: grid;
+            flex: 0 0 40px;
+            width: 40px;
+            height: 40px;
+            place-items: center;
+            border: 1.5px solid #d7deea;
+            border-radius: 50%;
+            background: #eef2f7;
+            color: #35465e;
+            font-size: 15px;
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(38, 54, 74, .08);
+            transition: background .18s, border-color .18s, transform .18s;
+        }
+        .profile-link:hover .profile-avatar {
+            border-color: #bdc9da;
+            background: #e2e8f0;
+        }
+        .profile {
+            max-width: 150px;
+            overflow: hidden;
+            color: #1e293b;
+            font-size: 13.5px;
+            font-weight: 700;
+            line-height: 1.35;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .profile small {
+            display: block;
+            margin-top: 2px;
+            color: #64748b;
+            font-size: 11.5px;
+            font-weight: 500;
+        }
+        .logout {
+            margin: 0;
+        }
+        .logout button {
+            display: grid;
+            width: 40px;
+            height: 40px;
+            place-items: center;
+            padding: 0;
+            border: 1px solid #d7deea;
+            border-radius: 10px;
+            background: #f8fafc;
+            color: #64748b;
+            cursor: pointer;
+            transition: background .18s, color .18s, border-color .18s, transform .18s;
+        }
+        .logout button svg {
+            width: 19px;
+            height: 19px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.8;
+        }
+        .logout button:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+            color: #dc2626;
+            transform: translateY(-1px);
+        }
         .main { width: 100%; }
         .content { width: min(1500px, 100%); margin: 0 auto; padding: 30px clamp(14px, 2vw, 28px) 56px; }
         .heading { display: flex; align-items: start; justify-content: space-between; gap: 18px; }
@@ -131,27 +260,26 @@
             display: none;
         }
 
-        @media (max-width: 1050px) {
-            .top { gap: 8px; }
-            .brand { gap: 5px; font-size: 17px; }
-            .brand img { width: 26px; height: 26px; }
-            .nav { flex: 1 1 auto; justify-content: center; gap: 1px; }
-            .nav a { min-height: 60px; padding-right: 4px; padding-left: 4px; font-size: clamp(9px, .95vw, 10px); }
-            .profile { max-width: 86px; font-size: 10px; }
-            .profile small { font-size: 9px; }
-            .logout { margin-left: 0; }
+        @media (max-width: 1150px) {
+            .top { gap: 14px; padding: 0 16px; }
+            .brand { gap: 8px; font-size: 20px; }
+            .brand img { width: 34px; height: 34px; }
+            .nav { gap: 4px; }
+            .nav a { min-height: 40px; padding: 0 8px; font-size: 13px; }
+            .profile { max-width: 110px; font-size: 12.5px; }
+            .profile small { font-size: 11px; }
         }
 
         /* Mobile View: Tampilan Sama Persis dengan Flutter Mobile App */
-        @media (max-width: 760px) {
+        @media (max-width: 800px) {
             .top {
-                min-height: 58px;
+                min-height: 64px;
                 padding: 0 16px;
                 justify-content: space-between;
                 gap: 12px;
             }
-            .brand { font-size: 18px; }
-            .brand img { width: 28px; height: 28px; }
+            .brand { font-size: 20px; gap: 8px; }
+            .brand img { width: 32px; height: 32px; }
             
             /* Sembunyikan desktop navbar dari atas */
             .nav {
@@ -163,18 +291,26 @@
                 gap: 10px;
             }
             .profile-avatar {
-                flex-basis: 32px;
-                width: 32px;
-                height: 32px;
-                font-size: 12px;
+                flex-basis: 36px;
+                width: 36px;
+                height: 36px;
+                font-size: 13.5px;
             }
             .profile {
-                max-width: 110px;
-                font-size: 12px;
+                max-width: 120px;
+                font-size: 12.5px;
             }
             .profile small {
                 display: block;
-                font-size: 10px;
+                font-size: 10.5px;
+            }
+            .logout button {
+                width: 36px;
+                height: 36px;
+            }
+            .logout button svg {
+                width: 17px;
+                height: 17px;
             }
 
             .content {
