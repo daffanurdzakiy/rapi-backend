@@ -20,10 +20,17 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         try {
-            if (\Illuminate\Support\Facades\Schema::hasTable('complaints') && ! \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'repair_note')) {
-                \Illuminate\Support\Facades\Schema::table('complaints', function (\Illuminate\Database\Schema\Blueprint $table) {
-                    $table->text('repair_note')->nullable()->after('status_repair');
-                });
+            if (\Illuminate\Support\Facades\Schema::hasTable('complaints')) {
+                if (! \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'repair_note')) {
+                    \Illuminate\Support\Facades\Schema::table('complaints', function (\Illuminate\Database\Schema\Blueprint $table) {
+                        $table->text('repair_note')->nullable()->after('status_repair');
+                    });
+                }
+                if (! \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'photo_data')) {
+                    \Illuminate\Support\Facades\Schema::table('complaints', function (\Illuminate\Database\Schema\Blueprint $table) {
+                        $table->longText('photo_data')->nullable()->after('photo_path');
+                    });
+                }
             }
         } catch (\Throwable $e) {
             // Abaikan jika database belum siap/terhubung

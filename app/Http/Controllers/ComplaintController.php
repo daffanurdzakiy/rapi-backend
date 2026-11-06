@@ -24,10 +24,17 @@ class ComplaintController extends Controller
     protected function ensureRepairNoteColumnExists(): void
     {
         try {
-            if (Schema::hasTable('complaints') && ! Schema::hasColumn('complaints', 'repair_note')) {
-                Schema::table('complaints', function (Blueprint $table) {
-                    $table->text('repair_note')->nullable()->after('status_repair');
-                });
+            if (Schema::hasTable('complaints')) {
+                if (! Schema::hasColumn('complaints', 'repair_note')) {
+                    Schema::table('complaints', function (Blueprint $table) {
+                        $table->text('repair_note')->nullable()->after('status_repair');
+                    });
+                }
+                if (! Schema::hasColumn('complaints', 'photo_data')) {
+                    Schema::table('complaints', function (Blueprint $table) {
+                        $table->longText('photo_data')->nullable()->after('photo_path');
+                    });
+                }
             }
         } catch (\Throwable $e) {
             // Abaikan jika tidak memiliki hak akses alter table atau sedang dalam proses
@@ -152,61 +159,35 @@ class ComplaintController extends Controller
     {
         $user = $request->user();
         $role = $user->role?->role_name;
+        $isAssignedPic = ($complaint->room && (int) $complaint->room->pic_id === (int) $user->id)
+            || $complaint->room()->where('pic_id', $user->id)->exists();
         $canView = $role === 'Admin'
-            || ($role === 'PIC' && $complaint->room()->where('pic_id', $user->id)->exists())
-            || (in_array($role, ['Guru', 'Organisasi']) && $complaint->reporter_id === $user->id);
+            || ($role === 'PIC' && $isAssignedPic)
+            || (in_array($role, ['Guru', 'Organisasi']) && (int) $complaint->reporter_id === (int) $user->id);
 
         abort_unless($canView, 403);
 
-        $rawPath = (string) $complaint->photo_path;
-        abort_if($rawPath === '', 404, 'Foto pengaduan belum diunggah.');
-
-        $cleanPath = str_replace('\\', '/', $rawPath);
-        $cleanPath = preg_replace('#^(public/|storage/)+#i', '', $cleanPath);
+        $cleanPath = app(ImageCompressionService::class)->resolveComplaintPhotoPath($complaint);
+        abort_unless($cleanPath !== null, 404, 'File foto bukti tidak ditemukan di penyimpanan server.');
 
         $disk = Storage::disk('public');
-        $fullPath = null;
-
-        if ($disk->exists($cleanPath)) {
-            $fullPath = $disk->path($cleanPath);
-        } else {
-            $candidates = [
-                $disk->path($rawPath),
-                storage_path('app/public/' . ltrim($cleanPath, '/')),
-                public_path('storage/' . ltrim($cleanPath, '/')),
-                public_path(ltrim($cleanPath, '/')),
-                storage_path('app/' . ltrim($cleanPath, '/')),
-                base_path('storage/app/public/' . ltrim($cleanPath, '/')),
-            ];
-            foreach ($candidates as $cand) {
-                if (file_exists($cand) && is_file($cand)) {
-                    $fullPath = $cand;
-                    try {
-                        $disk->put($cleanPath, file_get_contents($cand));
-                    } catch (\Throwable $e) {}
-                    break;
-                }
-            }
-        }
-
-        abort_unless($fullPath && file_exists($fullPath), 404, 'File foto bukti tidak ditemukan di penyimpanan server.');
+        $fullPath = $disk->path($cleanPath);
 
         $mime = 'image/jpeg';
         try {
-            $mime = $disk->mimeType($cleanPath) ?: (mime_content_type($fullPath) ?: 'image/jpeg');
+            $mime = $disk->mimeType($cleanPath) ?: (file_exists($fullPath) ? (mime_content_type($fullPath) ?: 'image/jpeg') : 'image/jpeg');
         } catch (\Throwable $e) {
             $mime = 'image/jpeg';
         }
 
-        $filename = basename($cleanPath);
-        $fileSize = (string) filesize($fullPath);
+        $headers = ['Content-Type' => $mime];
+        if (file_exists($fullPath)) {
+            $headers['Content-Length'] = (string) filesize($fullPath);
+        }
 
         return $disk->response(
             $cleanPath,
-            headers: [
-                'Content-Type' => $mime,
-                'Content-Length' => $fileSize,
-            ],
+            headers: $headers,
             disposition: 'inline'
         );
     }
@@ -243,7 +224,15 @@ class ComplaintController extends Controller
             'photo.image' => 'File yang diunggah harus berupa gambar.',
             'photo.mimes' => 'Format foto harus JPG, PNG, atau WebP.',
         ]);
+        $this->ensureRepairNoteColumnExists();
         $data['photo_path'] = $this->storeCompressedPhoto($data['photo']);
+        try {
+            if (Schema::hasColumn('complaints', 'photo_data')) {
+                $data['photo_data'] = app(ImageCompressionService::class)->encodePhotoFromDisk($data['photo_path']);
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika gagal encode cadangan
+        }
         unset($data['photo']);
         $complaint = Complaint::create($data + ['reporter_id' => $request->user()->id]);
         $room = Room::with('pic')->findOrFail($complaint->room_id);
@@ -264,7 +253,7 @@ class ComplaintController extends Controller
     {
         abort_unless(
             $request->user()->role?->role_name === 'Admin'
-                || $complaint->reporter_id === $request->user()->id,
+                || (int) $complaint->reporter_id === (int) $request->user()->id,
             403,
         );
 
@@ -276,8 +265,18 @@ class ComplaintController extends Controller
             'photo.image' => 'File yang diunggah harus berupa gambar.',
             'photo.mimes' => 'Format foto harus JPG, PNG, atau WebP.',
         ]);
+        $this->ensureRepairNoteColumnExists();
         $oldPhotoPath = $complaint->photo_path;
-        $complaint->update(['photo_path' => $this->storeCompressedPhoto($data['photo'])]);
+        $newPhotoPath = $this->storeCompressedPhoto($data['photo']);
+        $updatePayload = ['photo_path' => $newPhotoPath];
+        try {
+            if (Schema::hasColumn('complaints', 'photo_data')) {
+                $updatePayload['photo_data'] = app(ImageCompressionService::class)->encodePhotoFromDisk($newPhotoPath);
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika gagal encode cadangan
+        }
+        $complaint->update($updatePayload);
 
         if ($oldPhotoPath) {
             Storage::disk('public')->delete($oldPhotoPath);
@@ -292,7 +291,7 @@ class ComplaintController extends Controller
     {
         abort_unless(
             $request->user()->role?->role_name === 'PIC'
-                && $complaint->room->pic_id === $request->user()->id,
+                && (int) $complaint->room->pic_id === (int) $request->user()->id,
             403,
         );
         // Validasi status perbaikan dan catatan keterangan (keterangan bersifat opsional)
@@ -334,7 +333,7 @@ class ComplaintController extends Controller
     // Menghapus data pengaduan beserta file fotonya dari storage.
     public function destroy(Request $request, Complaint $complaint): RedirectResponse
     {
-        abort_unless($request->user()->role?->role_name === 'Admin' || $complaint->reporter_id === $request->user()->id, 403);
+        abort_unless($request->user()->role?->role_name === 'Admin' || (int) $complaint->reporter_id === (int) $request->user()->id, 403);
         if ($complaint->photo_path) {
             Storage::disk('public')->delete($complaint->photo_path);
         } $complaint->delete();

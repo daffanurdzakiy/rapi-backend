@@ -121,6 +121,9 @@ class ComplaintController extends ApiController
         // Kompres dan simpan foto ke disk `public` (folder `storage/app/public/complaints`)
         try {
             $data['photo_path'] = $this->storeCompressedPhoto($data['photo']);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('complaints', 'photo_data')) {
+                $data['photo_data'] = app(ImageCompressionService::class)->encodePhotoFromDisk($data['photo_path']);
+            }
         } catch (\Throwable $e) {
             return $this->sendError('Gagal memproses foto bukti: '.$e->getMessage(), null, 500);
         }
@@ -258,7 +261,7 @@ class ComplaintController extends ApiController
         $role = $user->role?->role_name;
 
         // Hanya pelapor asli atau Admin yang berhak mengganti foto bukti pengaduan
-        if ($role !== 'Admin' && $complaint->reporter_id !== $user->id) {
+        if ($role !== 'Admin' && (int) $complaint->reporter_id !== (int) $user->id) {
             return $this->sendError('Hanya pelapor pengaduan yang dapat memperbarui foto bukti.', null, 403);
         }
 
@@ -280,7 +283,16 @@ class ComplaintController extends ApiController
             return $this->sendError('Gagal memproses foto baru: '.$e->getMessage(), null, 500);
         }
 
-        $complaint->update(['photo_path' => $newPhotoPath]);
+        $updatePayload = ['photo_path' => $newPhotoPath];
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('complaints', 'photo_data')) {
+                $updatePayload['photo_data'] = app(ImageCompressionService::class)->encodePhotoFromDisk($newPhotoPath);
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika gagal encode cadangan
+        }
+
+        $complaint->update($updatePayload);
 
         // Hapus file foto lama dari disk agar tidak memenuhi penyimpanan server
         if ($oldPhotoPath && Storage::disk('public')->exists($oldPhotoPath)) {
@@ -329,18 +341,19 @@ class ComplaintController extends ApiController
         $role = $user->role?->role_name;
 
         $canView = $role === 'Admin'
-            || ($role === 'PIC' && $complaint->room()->where('pic_id', $user->id)->exists())
-            || (in_array($role, ['Guru', 'Organisasi'], true) && $complaint->reporter_id === $user->id);
+            || ($role === 'PIC' && (($complaint->room && (int) $complaint->room->pic_id === (int) $user->id) || $complaint->room()->where('pic_id', $user->id)->exists()))
+            || (in_array($role, ['Guru', 'Organisasi'], true) && (int) $complaint->reporter_id === (int) $user->id);
 
         if (! $canView) {
             return $this->sendError('Tidak memiliki izin melihat foto pengaduan ini.', null, 403);
         }
 
-        if (! $complaint->photo_path || ! Storage::disk('public')->exists($complaint->photo_path)) {
+        $resolvedPath = app(ImageCompressionService::class)->resolveComplaintPhotoPath($complaint);
+        if (! $resolvedPath) {
             return $this->sendError('File foto tidak ditemukan.', null, 404);
         }
 
-        return Storage::disk('public')->response($complaint->photo_path);
+        return Storage::disk('public')->response($resolvedPath, disposition: 'inline');
     }
 
     /**

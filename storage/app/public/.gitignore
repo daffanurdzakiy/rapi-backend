@@ -1,2 +1,7 @@
 *
+!complaints/
+!complaints/*.jpg
+!complaints/*.jpeg
+!complaints/*.png
+!complaints/*.webp
 !.gitignore

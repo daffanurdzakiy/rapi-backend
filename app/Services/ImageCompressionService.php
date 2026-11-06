@@ -107,7 +107,129 @@ class ImageCompressionService
             throw new RuntimeException('Foto gagal disimpan ke penyimpanan disk.');
         }
 
+        $this->syncToPublicStorageDir($path, $compressedContent);
+
         return $path;
+    }
+
+    /**
+     * Sinkronisasi file ke public/storage jika di hosting (cPanel) folder public/storage
+     * berupa direktori biasa dan bukan symlink.
+     */
+    protected function syncToPublicStorageDir(string $path, string $content): void
+    {
+        if (app()->runningUnitTests()) {
+            return;
+        }
+
+        try {
+            $publicStorageRoot = public_path('storage');
+            if (is_dir($publicStorageRoot) && ! is_link($publicStorageRoot)) {
+                $targetFile = $publicStorageRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, ltrim($path, '/'));
+                $targetDir = dirname($targetFile);
+                if (! is_dir($targetDir)) {
+                    @mkdir($targetDir, 0755, true);
+                }
+                @file_put_contents($targetFile, $content);
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika gagal menyalin ke public/storage
+        }
+    }
+
+    /**
+     * Membaca isi file foto dari disk 'public' dan mengenkodenya sebagai base64
+     * untuk cadangan pemulihan otomatis di database.
+     */
+    public function encodePhotoFromDisk(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        try {
+            $disk = Storage::disk('public');
+            if ($disk->exists($path)) {
+                $bytes = $disk->get($path);
+                if (is_string($bytes) && $bytes !== '') {
+                    return base64_encode($bytes);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika gagal membaca
+        }
+
+        return null;
+    }
+
+    /**
+     * Menemukan atau memulihkan file foto pengaduan di disk 'public' sehingga
+     * tidak terjadi error 404 ketika file belum tersinkronisasi di server.
+     */
+    public function resolveComplaintPhotoPath(\App\Models\Complaint $complaint): ?string
+    {
+        $rawPath = trim((string) $complaint->photo_path);
+        if ($rawPath === '') {
+            return null;
+        }
+
+        $cleanPath = str_replace('\\', '/', $rawPath);
+        $cleanPath = preg_replace('#^(public/|storage/|app/public/)+#i', '', $cleanPath);
+        $cleanPath = ltrim((string) $cleanPath, '/');
+
+        if ($cleanPath === '') {
+            return null;
+        }
+
+        $disk = Storage::disk('public');
+
+        // 1. Jika sudah ada di disk 'public', langsung kembalikan path-nya
+        if ($disk->exists($cleanPath)) {
+            return $cleanPath;
+        }
+
+        // 2. Cek berbagai kemungkinan lokasi path fisik di server
+        $basename = basename($cleanPath);
+        $candidates = [
+            $disk->path($rawPath),
+            storage_path('app/public/' . $cleanPath),
+            storage_path('app/public/complaints/' . $basename),
+            public_path('storage/' . $cleanPath),
+            public_path('storage/complaints/' . $basename),
+            public_path($cleanPath),
+            storage_path('app/' . $cleanPath),
+            base_path('storage/app/public/' . $cleanPath),
+            base_path('storage/app/public/complaints/' . $basename),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && $candidate !== '' && file_exists($candidate) && is_file($candidate)) {
+                try {
+                    $bytes = @file_get_contents($candidate);
+                    if (is_string($bytes) && $bytes !== '') {
+                        $disk->put($cleanPath, $bytes);
+                        return $cleanPath;
+                    }
+                } catch (\Throwable $e) {
+                    // Lanjut ke kandidat berikutnya
+                }
+            }
+        }
+
+        // 3. Pulihkan dari cadangan base64 di kolom photo_data jika tersedia
+        if (! empty($complaint->photo_data)) {
+            $decoded = base64_decode((string) $complaint->photo_data, true);
+            if (is_string($decoded) && $decoded !== '') {
+                try {
+                    $disk->put($cleanPath, $decoded);
+                    return $cleanPath;
+                } catch (\Throwable $e) {
+                    // Abaikan jika gagal menulis
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

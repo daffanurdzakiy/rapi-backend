@@ -12,7 +12,9 @@ class Complaint extends Model
 {
     // Daftar kolom yang diizinkan untuk diisi secara massal (Mass Assignment) saat Complaint::create() atau update()
     // Jika menambah kolom baru di tabel `complaints` (misal: 'priority'), tambahkan namanya ke array $fillable ini.
-    protected $fillable = ['room_id', 'reporter_id', 'description', 'photo_path', 'status_repair', 'repair_note'];
+    protected $fillable = ['room_id', 'reporter_id', 'description', 'photo_path', 'photo_data', 'status_repair', 'repair_note'];
+
+    protected $hidden = ['photo_data'];
 
     /** Get the room reported as damaged. */
     // Relasi Many-to-One (BelongsTo): Setiap pengaduan merujuk pada satu Ruangan (Room) yang dilaporkan rusak

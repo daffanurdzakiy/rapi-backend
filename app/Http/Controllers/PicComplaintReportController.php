@@ -19,62 +19,33 @@ class PicComplaintReportController extends Controller
         $role = $user->role?->role_name;
 
         // Boleh dilihat oleh Admin atau PIC yang bertanggung jawab atas ruangan tersebut
-        $isAssignedPic = ($complaint->room && $complaint->room->pic_id === $user->id)
+        $isAssignedPic = ($complaint->room && (int) $complaint->room->pic_id === (int) $user->id)
             || $complaint->room()->where('pic_id', $user->id)->exists();
         $canView = $role === 'Admin' || ($role === 'PIC' && $isAssignedPic);
 
         abort_unless($canView, 403);
 
-        $rawPath = (string) $complaint->photo_path;
-        abort_if($rawPath === '', 404, 'Foto pengaduan belum diunggah.');
-
-        // Normalisasi path foto: ubah backslash ke slash, hapus prefix jika ada
-        $cleanPath = str_replace('\\', '/', $rawPath);
-        $cleanPath = preg_replace('#^(public/|storage/)+#i', '', $cleanPath);
+        $cleanPath = app(\App\Services\ImageCompressionService::class)->resolveComplaintPhotoPath($complaint);
+        abort_unless($cleanPath !== null, 404, 'File foto bukti tidak ditemukan di penyimpanan server.');
 
         $disk = Storage::disk('public');
-        $fullPath = null;
-
-        if ($disk->exists($cleanPath)) {
-            $fullPath = $disk->path($cleanPath);
-        } else {
-            $candidates = [
-                $disk->path($rawPath),
-                storage_path('app/public/' . ltrim($cleanPath, '/')),
-                public_path('storage/' . ltrim($cleanPath, '/')),
-                public_path(ltrim($cleanPath, '/')),
-                storage_path('app/' . ltrim($cleanPath, '/')),
-                base_path('storage/app/public/' . ltrim($cleanPath, '/')),
-            ];
-            foreach ($candidates as $cand) {
-                if (file_exists($cand) && is_file($cand)) {
-                    $fullPath = $cand;
-                    try {
-                        $disk->put($cleanPath, file_get_contents($cand));
-                    } catch (\Throwable $e) {}
-                    break;
-                }
-            }
-        }
-
-        abort_unless($fullPath && file_exists($fullPath), 404, 'File foto bukti tidak ditemukan di penyimpanan server.');
+        $fullPath = $disk->path($cleanPath);
 
         $mime = 'image/jpeg';
         try {
-            $mime = $disk->mimeType($cleanPath) ?: (mime_content_type($fullPath) ?: 'image/jpeg');
+            $mime = $disk->mimeType($cleanPath) ?: (file_exists($fullPath) ? (mime_content_type($fullPath) ?: 'image/jpeg') : 'image/jpeg');
         } catch (\Throwable $e) {
             $mime = 'image/jpeg';
         }
 
-        $filename = basename($cleanPath);
-        $fileSize = (string) filesize($fullPath);
+        $headers = ['Content-Type' => $mime];
+        if (file_exists($fullPath)) {
+            $headers['Content-Length'] = (string) filesize($fullPath);
+        }
 
         return $disk->response(
             $cleanPath,
-            headers: [
-                'Content-Type' => $mime,
-                'Content-Length' => $fileSize,
-            ],
+            headers: $headers,
             disposition: 'inline'
         );
     }

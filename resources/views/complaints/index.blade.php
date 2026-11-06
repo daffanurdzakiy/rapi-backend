@@ -154,7 +154,7 @@
                     </div>
                 </div>
 
-                @if(!$complaint->photo_path && (auth()->user()->role?->role_name === 'Admin' || $complaint->reporter_id === auth()->id()))
+                @if(!$complaint->photo_path && (auth()->user()->role?->role_name === 'Admin' || (int) $complaint->reporter_id === (int) auth()->id()))
                     <form method="post" action="{{ route('complaints.photo', $complaint) }}" enctype="multipart/form-data" style="margin:12px 0">
                         @csrf
                         @method('PATCH')
