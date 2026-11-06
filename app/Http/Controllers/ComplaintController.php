@@ -157,14 +157,57 @@ class ComplaintController extends Controller
             || (in_array($role, ['Guru', 'Organisasi']) && $complaint->reporter_id === $user->id);
 
         abort_unless($canView, 403);
-        abort_unless($complaint->photo_path && Storage::disk('public')->exists($complaint->photo_path), 404);
+
+        $rawPath = (string) $complaint->photo_path;
+        abort_if($rawPath === '', 404, 'Foto pengaduan belum diunggah.');
+
+        $cleanPath = str_replace('\\', '/', $rawPath);
+        $cleanPath = preg_replace('#^(public/|storage/)+#i', '', $cleanPath);
 
         $disk = Storage::disk('public');
+        $fullPath = null;
+
+        if ($disk->exists($cleanPath)) {
+            $fullPath = $disk->path($cleanPath);
+        } else {
+            $candidates = [
+                $disk->path($rawPath),
+                storage_path('app/public/' . ltrim($cleanPath, '/')),
+                public_path('storage/' . ltrim($cleanPath, '/')),
+                public_path(ltrim($cleanPath, '/')),
+                storage_path('app/' . ltrim($cleanPath, '/')),
+                base_path('storage/app/public/' . ltrim($cleanPath, '/')),
+            ];
+            foreach ($candidates as $cand) {
+                if (file_exists($cand) && is_file($cand)) {
+                    $fullPath = $cand;
+                    try {
+                        $disk->put($cleanPath, file_get_contents($cand));
+                    } catch (\Throwable $e) {}
+                    break;
+                }
+            }
+        }
+
+        abort_unless($fullPath && file_exists($fullPath), 404, 'File foto bukti tidak ditemukan di penyimpanan server.');
+
+        $mime = 'image/jpeg';
+        try {
+            $mime = $disk->mimeType($cleanPath) ?: (mime_content_type($fullPath) ?: 'image/jpeg');
+        } catch (\Throwable $e) {
+            $mime = 'image/jpeg';
+        }
+
+        $filename = basename($cleanPath);
+        $fileSize = (string) filesize($fullPath);
 
         return $disk->response(
-            $complaint->photo_path,
-            headers: ['Content-Type' => $disk->mimeType($complaint->photo_path)],
-            disposition: 'inline',
+            $cleanPath,
+            headers: [
+                'Content-Type' => $mime,
+                'Content-Length' => $fileSize,
+            ],
+            disposition: 'inline'
         );
     }
 
