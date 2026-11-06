@@ -3,7 +3,7 @@
 <style>
     .users-toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:4px 0 18px; }
     .users-toolbar .card { margin:0; }
-    .users-actions-group { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .users-actions-group { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
     .add-user-card, .import-user-card { flex:0 0 auto; padding:9px 12px; }
     .add-user-card > summary, .import-user-card > summary { list-style:none; }
     .add-user-card > summary::-webkit-details-marker, .import-user-card > summary::-webkit-details-marker { display:none; }
@@ -97,21 +97,24 @@
                     </div>
                 </div>
             </div>
-            <button class="btn" style="margin-top:20px">Simpan Pengguna</button>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:20px;">
+                <button class="btn" type="submit">Simpan Pengguna</button>
+                <button type="button" class="btn ghost" id="btn-cancel-add">Batal</button>
+            </div>
             </form>
         </details>
 
         <details class="import-user-card" @if ($errors->has('import_file') || old('is_import')) open @endif>
-            <summary class="btn ghost">📥 Import File</summary>
+            <summary class="btn ghost">Import File</summary>
             <form method="post" action="{{ route('admin.users.import') }}" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="is_import" value="1">
                 <div style="margin-bottom:14px; padding:12px 14px; border-radius:8px; background:#f0f7ff; border:1px solid #c7dffd; color:#1e3a8a; font-size:13px; line-height:1.5;">
                     <div style="font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
-                        <span>Metode Upload File Excel / Spreadsheet</span>
+                        <span>Upload File Excel / Spreadsheet</span>
                     </div>
                     <div>
-                        Unggah file <b>Excel (.xlsx)</b> atau <b>CSV (.csv)</b> berisi daftar pengguna untuk ditambahkan secara otomatis sekaligus.
+                        Unggah file <b>Excel (.xlsx)</b> atau <b>CSV (.csv)</b>.
                     </div>
                     <div style="margin-top:8px;">
                         <a href="{{ route('admin.users.template') }}" class="btn ghost" style="min-height:30px; padding:3px 12px; font-size:12px; text-decoration:none; display:inline-flex; align-items:center; gap:5px;">
@@ -126,24 +129,11 @@
                         <input id="import_file" type="file" name="import_file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" required>
                         <span class="muted" style="font-size:12px; display:block; margin-top:4px;">Kolom yang didukung: <b>Nama Lengkap</b>, <b>Email</b>, <b>Peran</b> (Guru/Organisasi/PIC), <b>WhatsApp</b>, <b>Password</b></span>
                     </div>
-                    <div>
-                        <label for="default_role_id">Peran Default <span style="font-size:11px; color:#64748b; font-weight:normal;">(Jika kolom Peran di file kosong)</span></label>
-                        <select id="default_role_id" name="default_role_id">
-                            @foreach ($roles as $role)
-                                <option value="{{ $role->id }}" @selected($role->role_name === 'Guru')>
-                                    {{ $role->role_name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label for="default_password">Password Default <span style="font-size:11px; color:#64748b; font-weight:normal;">(Jika kolom Password di file kosong)</span></label>
-                        <input id="default_password" name="default_password" value="rapi123" placeholder="Minimal 6 karakter" minlength="6">
-                    </div>
                 </div>
 
                 <div style="display:flex; align-items:center; gap:10px; margin-top:18px;">
                     <button class="btn" type="submit">Unggah & Import Pengguna</button>
+                    <button type="button" class="btn ghost" id="btn-cancel-import">Batal</button>
                 </div>
             </form>
         </details>
@@ -274,5 +264,52 @@
     @if ($errors->any() && old('user_id'))
         document.getElementById('user-edit-{{ old('user_id') }}')?.showModal();
     @endif
+
+    (function () {
+        var addCard = document.querySelector('.add-user-card');
+        var importCard = document.querySelector('.import-user-card');
+        var searchForm = document.querySelector('.user-search');
+        var btnCancelAdd = document.getElementById('btn-cancel-add');
+        var btnCancelImport = document.getElementById('btn-cancel-import');
+
+        function updateToolbarVisibility() {
+            if (!addCard || !importCard || !searchForm) return;
+
+            if (addCard.open) {
+                importCard.style.display = 'none';
+                searchForm.style.display = 'none';
+            } else if (importCard.open) {
+                addCard.style.display = 'none';
+                searchForm.style.display = 'none';
+            } else {
+                addCard.style.display = '';
+                importCard.style.display = '';
+                searchForm.style.display = '';
+            }
+        }
+
+        if (addCard) {
+            addCard.addEventListener('toggle', updateToolbarVisibility);
+        }
+        if (importCard) {
+            importCard.addEventListener('toggle', updateToolbarVisibility);
+        }
+
+        if (btnCancelAdd && addCard) {
+            btnCancelAdd.addEventListener('click', function () {
+                addCard.open = false;
+                updateToolbarVisibility();
+            });
+        }
+
+        if (btnCancelImport && importCard) {
+            btnCancelImport.addEventListener('click', function () {
+                importCard.open = false;
+                updateToolbarVisibility();
+            });
+        }
+
+        updateToolbarVisibility();
+    })();
 </script>
 @endsection
