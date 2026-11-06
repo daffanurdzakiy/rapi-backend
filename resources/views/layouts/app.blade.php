@@ -75,7 +75,7 @@
             display: flex;
             flex: 1 1 auto;
             min-width: 0;
-            align-items: center;
+            align-items: stretch;
             justify-content: center;
             gap: clamp(4px, .6vw, 10px);
             overflow: visible;
@@ -85,26 +85,39 @@
             display: inline-flex;
             flex: 0 0 auto;
             min-width: 0;
-            min-height: 44px;
+            min-height: 72px;
             align-items: center;
             padding: 0 clamp(10px, 1vw, 16px);
-            border-radius: 9px;
+            border-radius: 8px 8px 0 0;
             color: #55657b;
             font-size: clamp(13px, .92vw, 14.5px);
             font-weight: 600;
             white-space: nowrap;
             text-decoration: none;
-            transition: color .18s, background .18s, transform .18s;
+            transition: color .18s, background .18s;
+        }
+        .nav a::after {
+            position: absolute;
+            right: 10px;
+            bottom: 0;
+            left: 10px;
+            height: 3.5px;
+            border-radius: 3px 3px 0 0;
+            background: transparent;
+            content: "";
+            transition: background .18s ease;
         }
         .nav a:hover {
             color: #1e293b;
-            background: #eef2f7;
+            background: #f1f3f6;
         }
         .nav a.active {
-            background: #e5ebf3;
+            background: #f1f3f6;
             color: #1e293b;
             font-weight: 700;
-            box-shadow: inset 0 -2.5px 0 0 var(--accent);
+        }
+        .nav a.active::after {
+            background: var(--accent);
         }
         .top-actions {
             display: flex;
@@ -265,7 +278,7 @@
             .brand { gap: 8px; font-size: 20px; }
             .brand img { width: 34px; height: 34px; }
             .nav { gap: 4px; }
-            .nav a { min-height: 40px; padding: 0 8px; font-size: 13px; }
+            .nav a { min-height: 68px; padding: 0 8px; font-size: 13px; }
             .profile { max-width: 110px; font-size: 12.5px; }
             .profile small { font-size: 11px; }
         }
