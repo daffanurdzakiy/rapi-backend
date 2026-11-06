@@ -3,10 +3,11 @@
 <style>
     .users-toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:4px 0 18px; }
     .users-toolbar .card { margin:0; }
-    .add-user-card { flex:0 0 auto; padding:9px 12px; }
-    .add-user-card > summary { list-style:none; }
-    .add-user-card > summary::-webkit-details-marker { display:none; }
-    .add-user-card form { min-width:min(620px, calc(100vw - 64px)); margin-top:14px; }
+    .users-actions-group { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .add-user-card, .import-user-card { flex:0 0 auto; padding:9px 12px; }
+    .add-user-card > summary, .import-user-card > summary { list-style:none; }
+    .add-user-card > summary::-webkit-details-marker, .import-user-card > summary::-webkit-details-marker { display:none; }
+    .add-user-card form, .import-user-card form { min-width:min(620px, calc(100vw - 64px)); margin-top:14px; }
     .user-search { display:flex; flex:0 1 380px; align-items:center; gap:8px; }
     .user-search input { min-width:0; }
     .user-search .btn { flex:0 0 auto; }
@@ -25,7 +26,8 @@
     .user-edit-actions { display:flex; justify-content:flex-end; gap:9px; margin-top:20px; padding-top:15px; border-top:1px solid #e8e1d3; }
     @media (max-width:760px) {
         .users-toolbar { align-items:stretch; flex-direction:column; }
-        .add-user-card form { min-width:0; }
+        .users-actions-group { width:100%; }
+        .add-user-card form, .import-user-card form { min-width:0; }
         .user-search { flex:1 1 auto; }
         .user-actions { min-width:120px; gap:6px; }
         .user-actions .btn { min-height:34px; padding:7px 10px; font-size:12px; }
@@ -52,51 +54,100 @@
 @endif
 
 <div class="card users-toolbar">
-    <details class="add-user-card" @if ($errors->any() && !old('user_id')) open @endif>
-        <summary class="btn">+ Tambah Pengguna</summary>
-        <form method="post" action="{{ route('admin.users.store') }}">
-        @csrf
-        <div class="form-grid">
-            <div>
-                <label>Nama lengkap</label>
-                <input name="name" value="{{ old('name') }}" required>
-            </div>
-            <div>
-                <label>Email</label>
-                <input type="email" name="email" value="{{ old('email') }}" required>
-            </div>
-            <div>
-                <label>WhatsApp</label>
-                <input name="whatsapp" value="{{ old('whatsapp') }}">
-            </div>
-            <div>
-                <label>Peran</label>
-                <select name="role_id" required>
-                    @foreach ($roles as $role)
-                        <option value="{{ $role->id }}" @selected((string) old('role_id') === (string) $role->id)>
-                            {{ $role->role_name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-            <div>
-                <label>Password</label>
-                <div class="password-field">
-                    <input type="password" name="password" required>
-                    <button type="button" class="password-toggle" aria-label="Tampilkan password">◉</button>
+    <div class="users-actions-group">
+        <details class="add-user-card" @if ($errors->any() && !old('user_id') && !old('is_import')) open @endif>
+            <summary class="btn">+ Tambah Pengguna</summary>
+            <form method="post" action="{{ route('admin.users.store') }}">
+            @csrf
+            <div class="form-grid">
+                <div>
+                    <label>Nama lengkap</label>
+                    <input name="name" value="{{ old('name') }}" required>
+                </div>
+                <div>
+                    <label>Email</label>
+                    <input type="email" name="email" value="{{ old('email') }}" required>
+                </div>
+                <div>
+                    <label>WhatsApp</label>
+                    <input name="whatsapp" value="{{ old('whatsapp') }}">
+                </div>
+                <div>
+                    <label>Peran</label>
+                    <select name="role_id" required>
+                        @foreach ($roles as $role)
+                            <option value="{{ $role->id }}" @selected((string) old('role_id') === (string) $role->id)>
+                                {{ $role->role_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label>Password</label>
+                    <div class="password-field">
+                        <input type="password" name="password" required>
+                        <button type="button" class="password-toggle" aria-label="Tampilkan password">◉</button>
+                    </div>
+                </div>
+                <div>
+                    <label>Konfirmasi password</label>
+                    <div class="password-field">
+                        <input type="password" name="password_confirmation" required>
+                        <button type="button" class="password-toggle" aria-label="Tampilkan password">◉</button>
+                    </div>
                 </div>
             </div>
-            <div>
-                <label>Konfirmasi password</label>
-                <div class="password-field">
-                    <input type="password" name="password_confirmation" required>
-                    <button type="button" class="password-toggle" aria-label="Tampilkan password">◉</button>
+            <button class="btn" style="margin-top:20px">Simpan Pengguna</button>
+            </form>
+        </details>
+
+        <details class="import-user-card" @if ($errors->has('import_file') || old('is_import')) open @endif>
+            <summary class="btn ghost">📥 Import File</summary>
+            <form method="post" action="{{ route('admin.users.import') }}" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="is_import" value="1">
+                <div style="margin-bottom:14px; padding:12px 14px; border-radius:8px; background:#f0f7ff; border:1px solid #c7dffd; color:#1e3a8a; font-size:13px; line-height:1.5;">
+                    <div style="font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                        <span>Metode Upload File Excel / Spreadsheet</span>
+                    </div>
+                    <div>
+                        Unggah file <b>Excel (.xlsx)</b> atau <b>CSV (.csv)</b> berisi daftar pengguna untuk ditambahkan secara otomatis sekaligus.
+                    </div>
+                    <div style="margin-top:8px;">
+                        <a href="{{ route('admin.users.template') }}" class="btn ghost" style="min-height:30px; padding:3px 12px; font-size:12px; text-decoration:none; display:inline-flex; align-items:center; gap:5px;">
+                            📄 Download Template CSV
+                        </a>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <button class="btn" style="margin-top:20px">Simpan Pengguna</button>
-        </form>
-    </details>
+
+                <div class="form-grid">
+                    <div class="full">
+                        <label for="import_file">Pilih File (.xlsx / .csv) <span style="color:#e11d48">*</span></label>
+                        <input id="import_file" type="file" name="import_file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" required>
+                        <span class="muted" style="font-size:12px; display:block; margin-top:4px;">Kolom yang didukung: <b>Nama Lengkap</b>, <b>Email</b>, <b>Peran</b> (Guru/Organisasi/PIC), <b>WhatsApp</b>, <b>Password</b></span>
+                    </div>
+                    <div>
+                        <label for="default_role_id">Peran Default <span style="font-size:11px; color:#64748b; font-weight:normal;">(Jika kolom Peran di file kosong)</span></label>
+                        <select id="default_role_id" name="default_role_id">
+                            @foreach ($roles as $role)
+                                <option value="{{ $role->id }}" @selected($role->role_name === 'Guru')>
+                                    {{ $role->role_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="default_password">Password Default <span style="font-size:11px; color:#64748b; font-weight:normal;">(Jika kolom Password di file kosong)</span></label>
+                        <input id="default_password" name="default_password" value="rapi123" placeholder="Minimal 6 karakter" minlength="6">
+                    </div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:10px; margin-top:18px;">
+                    <button class="btn" type="submit">Unggah & Import Pengguna</button>
+                </div>
+            </form>
+        </details>
+    </div>
     <form class="user-search" method="GET" action="{{ route('admin.users.index') }}" role="search">
         <input type="search" name="q" value="{{ $search }}" placeholder="Cari nama, email, no. HP, atau peran..." aria-label="Cari pengguna">
         <button class="btn" type="submit">Cari</button>

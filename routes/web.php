@@ -85,6 +85,8 @@ Route::middleware(['auth', 'admin'])->group(function () {
     // Manajemen Data Pengguna (CRUD User oleh Admin)
     Route::get('/admin/users', [AdminUserController::class, 'index'])->name('admin.users.index');
     Route::post('/admin/users', [AdminUserController::class, 'store'])->name('admin.users.store');
+    Route::get('/admin/users/template-import', [AdminUserController::class, 'downloadTemplate'])->name('admin.users.template');
+    Route::post('/admin/users/import', [AdminUserController::class, 'import'])->name('admin.users.import');
     Route::put('/admin/users/{user}', [AdminUserController::class, 'update'])->name('admin.users.update');
     Route::delete('/admin/users/{user}', [AdminUserController::class, 'destroy'])->name('admin.users.destroy');
 
