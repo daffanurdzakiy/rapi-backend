@@ -1,26 +1,25 @@
 <style>
-    :root {
-        color: #202d5b;
-        background: #f4f7fc;
-        font-family: Arial, sans-serif;
-        font-synthesis: none;
+    .public-calendar {
+        min-height: 100vh;
+        margin: 0;
+        box-sizing: border-box;
+        background: #f7f4eb;
+        color: #26364a;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
-
-    * { box-sizing: border-box; }
-    body { margin: 0; }
-    .public-calendar { min-height: 100vh; background: #f4f7fc; }
+    .public-calendar * { box-sizing: border-box; }
     .public-topbar {
         height: 68px;
         padding: 0 max(28px, calc((100% - 1200px) / 2));
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-top: 4px solid #315cff;
-        border-bottom: 1px solid #cbd6e8;
-        background: #e9eff8;
-        box-shadow: 0 8px 22px rgba(33, 56, 116, .16);
+        border-top: 3.5px solid #35465e;
+        border-bottom: 1px solid #e2dbcb;
+        background: rgba(255, 253, 248, .98);
+        box-shadow: 0 4px 18px rgba(38, 54, 74, .06);
     }
-    .public-brand { display: inline-flex; align-items: center; gap: 8px; color: #172033; font-family: Georgia, serif; font-size: 21px; font-weight: 700; text-decoration: none; }
+    .public-brand { display: inline-flex; align-items: center; gap: 8px; color: #172033; font-family: Inter, system-ui, -apple-system, sans-serif; font-size: 21px; font-weight: 800; text-decoration: none; }
     .brand-emblem { display: block; width: 34px; height: 34px; object-fit: contain; }
     .login-link { padding: 10px 23px; border-radius: 9px; background: #315cff; color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; box-shadow: 0 5px 12px #315cff30; transition: transform .18s, box-shadow .18s; }
     .login-link:hover { transform: translateY(-1px); box-shadow: 0 8px 16px #315cff40; }
@@ -39,7 +38,7 @@
         box-shadow: 0 14px 34px rgba(32, 52, 103, .09), 0 2px 7px rgba(32, 52, 103, .04);
     }
     .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
-    .month-title { margin: 0; color: #27366d; font-family: Georgia, serif; font-size: 24px; font-weight: 500; }
+    .month-title { margin: 0; color: #26364a; font-family: Inter, system-ui, -apple-system, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -.4px; }
     .month-title span { color: #8190b7; }
     .calendar-controls { display: flex; align-items: center; gap: 9px; }
     .calendar-control {
@@ -104,7 +103,7 @@
     .agenda-dialog { width: min(460px, calc(100% - 32px)); max-height: min(82vh, 620px); overflow: auto; padding: 26px 28px 20px; border: 0; border-radius: 20px; background: #fff; color: #202d5b; box-shadow: 0 24px 80px rgba(25, 39, 85, .25); }
     .agenda-dialog::backdrop { background: rgba(42, 57, 101, .34); backdrop-filter: blur(4px); }
     .dialog-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding-bottom: 17px; border-bottom: 1px solid #e5eaf5; }
-    .dialog-heading h2 { margin: 0; color: #27366d; font-family: Georgia, serif; font-size: 22px; font-weight: 500; }
+    .dialog-heading h2 { margin: 0; color: #26364a; font-family: Inter, system-ui, -apple-system, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
     .dialog-heading p { margin: 5px 0 0; color: #7c8aaf; font-size: 13px; }
     .dialog-close { flex: 0 0 34px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #eff3ff; color: #315cff; cursor: pointer; font-size: 20px; line-height: 1; transition: transform .18s, background .18s; }
     .dialog-close:hover { transform: rotate(90deg); background: #e2eaff; }
@@ -119,8 +118,7 @@
     /* =========================================================================
        TEMA WARNA RESMI (LIGHT THEME UTAMA APLIKASI)
        ========================================================================= */
-    :root { color-scheme: light; color: #26364a; background: #f7f4eb; }
-    .public-calendar, .calendar-page { color: #26364a; background: #f7f4eb; }
+    .calendar-page { color: #26364a; }
     .public-topbar { border-top-color: #35465e; border-bottom-color: #e8e1d3; background: #fffdf8; box-shadow: 0 8px 22px rgba(38, 54, 74, .08); }
     .public-brand, .public-brand:hover { color: #26364a; }
     .login-link { background: #35465e; color: #fffdf8; box-shadow: 0 5px 12px rgba(53, 70, 94, .14); }
