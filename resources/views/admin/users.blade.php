@@ -4,7 +4,7 @@
     .users-toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:4px 0 18px; }
     .users-toolbar .card { margin:0; }
     .users-actions-group { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-    .add-user-card, .import-user-card { flex:0 0 auto; padding:9px 12px; }
+    .add-user-card, .import-user-card { flex:0 0 auto; padding:0; margin:0; border:none; }
     .add-user-card > summary, .import-user-card > summary { list-style:none; }
     .add-user-card > summary::-webkit-details-marker, .import-user-card > summary::-webkit-details-marker { display:none; }
     .add-user-card form, .import-user-card form { min-width:min(620px, calc(100vw - 64px)); margin-top:14px; }
@@ -26,7 +26,7 @@
     .user-edit-actions { display:flex; justify-content:flex-end; gap:9px; margin-top:20px; padding-top:15px; border-top:1px solid #e8e1d3; }
     @media (max-width:760px) {
         .users-toolbar { align-items:stretch; flex-direction:column; }
-        .users-actions-group { width:100%; }
+        .users-actions-group { width:100%; gap:6px; }
         .add-user-card form, .import-user-card form { min-width:0; }
         .user-search { flex:1 1 auto; }
         .user-actions { min-width:120px; gap:6px; }
