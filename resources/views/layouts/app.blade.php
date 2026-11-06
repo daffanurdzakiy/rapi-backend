@@ -25,6 +25,10 @@
             --danger: #35465e;
         }
 
+        html {
+            scrollbar-gutter: stable;
+        }
+
         * { box-sizing: border-box; }
         body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--page); color: var(--text); }
         a { color: #465a73; }
@@ -49,7 +53,7 @@
         }
         .brand {
             display: inline-flex;
-            flex: 0 0 auto;
+            flex: 0 0 220px;
             align-items: center;
             gap: 12px;
             color: #26364a;
@@ -85,23 +89,23 @@
             display: inline-flex;
             flex: 0 0 auto;
             min-width: 0;
-            min-height: 72px;
+            min-height: 76px;
             align-items: center;
             padding: 0 clamp(10px, 1vw, 16px);
-            border-radius: 8px 8px 0 0;
-            color: #55657b;
+            color: #64748b;
             font-size: clamp(13px, .92vw, 14.5px);
             font-weight: 600;
             white-space: nowrap;
             text-decoration: none;
-            transition: color .18s, background .18s;
+            background: transparent;
+            transition: color .18s ease;
         }
         .nav a::after {
             position: absolute;
-            right: 10px;
+            right: 12px;
             bottom: 0;
-            left: 10px;
-            height: 3.5px;
+            left: 12px;
+            height: 3px;
             border-radius: 3px 3px 0 0;
             background: transparent;
             content: "";
@@ -109,19 +113,20 @@
         }
         .nav a:hover {
             color: #1e293b;
-            background: #f1f3f6;
+            background: transparent;
         }
         .nav a.active {
-            background: #f1f3f6;
             color: #1e293b;
-            font-weight: 700;
+            font-weight: 600;
+            background: transparent;
         }
         .nav a.active::after {
             background: var(--accent);
         }
         .top-actions {
             display: flex;
-            flex: 0 0 auto;
+            flex: 0 0 220px;
+            justify-content: flex-end;
             align-items: center;
             gap: 12px;
         }
@@ -275,10 +280,12 @@
 
         @media (max-width: 1150px) {
             .top { gap: 14px; padding: 0 16px; }
-            .brand { gap: 8px; font-size: 20px; }
+            .brand { flex: 0 0 auto; gap: 8px; font-size: 20px; }
             .brand img { width: 34px; height: 34px; }
             .nav { gap: 4px; }
-            .nav a { min-height: 68px; padding: 0 8px; font-size: 13px; }
+            .nav a { min-height: 72px; padding: 0 8px; font-size: 13px; }
+            .nav a::after { right: 8px; left: 8px; }
+            .top-actions { flex: 0 0 auto; }
             .profile { max-width: 110px; font-size: 12.5px; }
             .profile small { font-size: 11px; }
         }
