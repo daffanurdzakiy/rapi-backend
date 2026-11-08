@@ -33,19 +33,19 @@ class EventController extends ApiController
     {
         $user = $request->user();
         $role = $user->role?->role_name;
+        $today = now('Asia/Jakarta')->toDateString();
 
-        $query = Event::with(['room.pic', 'user', 'approver']);
+        // Urutkan dari hari ini dan tanggal terdekat yang akan datang (identik dengan Desktop Web)
+        $query = Event::with(['room.pic', 'user', 'approver'])
+            ->orderByRaw('CASE WHEN event_date >= ? THEN 0 ELSE 1 END', [$today])
+            ->orderBy('event_date', 'asc')
+            ->orderBy('start_time', 'asc');
 
         // Pembatasan data berdasarkan role user yang login
         if ($role === 'PIC') {
             $query->whereHas('room', fn ($roomQuery) => $roomQuery->where('pic_id', $user->id));
         } elseif ($role !== 'Admin') {
             $query->where('user_id', $user->id);
-        }
-
-        // Filter opsional: status ('Pending', 'Disetujui', 'Ditolak')
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
         }
 
         // Filter opsional: berdasarkan ruangan tertentu (`room_id`)
@@ -61,16 +61,54 @@ class EventController extends ApiController
             $query->whereBetween('event_date', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()]);
         }
 
-        // Urutkan dari tanggal agenda terbaru lalu jam mulai paling awal, dengan pagination
-        $events = $query->orderByDesc('event_date')->orderBy('start_time')->paginate($request->input('per_page', 20));
+        $rawEvents = $query->get();
+
+        // Filter pembersihan otomatis:
+        // - Agenda 'Sudah Terlaksana' hari ini hilang setelah ganti hari (jam 23:59).
+        // - Agenda 'Ditolak' hilang setelah 24 jam sejak ditolak.
+        $allEvents = $rawEvents->reject(function ($event) {
+            return $event->isExpiredFromView();
+        })->values();
+
+        // Hitung jumlah per status pelaksanaan real-time untuk badge tab filter
+        $counts = [
+            'semua' => $allEvents->count(),
+            'sedang_berlangsung' => $allEvents->where('execution_status', 'Sedang Berlangsung')->count(),
+            'belum_terlaksana' => $allEvents->where('execution_status', 'Belum Terlaksana')->count(),
+            'sudah_terlaksana' => $allEvents->where('execution_status', 'Sudah Terlaksana')->count(),
+            'menunggu_persetujuan' => $allEvents->filter(fn ($item) => in_array($item->execution_status, ['Menunggu Persetujuan', 'Pending']))->count(),
+            'ditolak' => $allEvents->where('status', 'Ditolak')->count(),
+        ];
+
+        // Filter status (mendukung slug real-time & legacy status)
+        $filter = $request->query('status', 'semua');
+        if (in_array($filter, ['pending', 'Pending'], true)) {
+            $filter = 'menunggu_persetujuan';
+        }
+
+        $filteredEvents = match ($filter) {
+            'sedang_berlangsung' => $allEvents->where('execution_status', 'Sedang Berlangsung')->values(),
+            'belum_terlaksana' => $allEvents->where('execution_status', 'Belum Terlaksana')->values(),
+            'sudah_terlaksana' => $allEvents->where('execution_status', 'Sudah Terlaksana')->values(),
+            'menunggu_persetujuan' => $allEvents->filter(fn ($item) => in_array($item->execution_status, ['Menunggu Persetujuan', 'Pending']))->values(),
+            'ditolak', 'Ditolak' => $allEvents->where('status', 'Ditolak')->values(),
+            'disetujui', 'Disetujui' => $allEvents->where('status', 'Disetujui')->values(),
+            default => $allEvents,
+        };
+
+        $perPage = (int) $request->input('per_page', 20);
+        $page = (int) $request->input('page', 1);
+        $total = $filteredEvents->count();
+        $paginatedItems = $filteredEvents->forPage($page, $perPage)->values();
 
         return $this->sendResponse([
-            'items' => EventResource::collection($events->items()),
+            'items' => EventResource::collection($paginatedItems),
+            'counts' => $counts,
             'pagination' => [
-                'current_page' => $events->currentPage(),
-                'last_page' => $events->lastPage(),
-                'per_page' => $events->perPage(),
-                'total' => $events->total(),
+                'current_page' => $page,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'total' => $total,
             ],
         ], 'Daftar agenda peminjaman berhasil dimuat.');
     }
