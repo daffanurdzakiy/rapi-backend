@@ -30,6 +30,35 @@ class DashboardController extends ApiController
         $user = $request->user();
         $role = $user->role?->role_name;
 
+        // Jadwal status ruangan unggulan hari ini (Ruang Wijaya dan Ruang DAK)
+        $featuredRoomSchedules = collect(['Wijaya', 'Dak'])->map(function (string $keyword) {
+            $room = Room::query()
+                ->where('room_name', 'like', "%{$keyword}%")
+                ->with(['events' => fn ($query) => $query
+                    ->whereDate('event_date', today('Asia/Jakarta'))
+                    ->whereIn('status', ['Pending', 'Disetujui'])
+                    ->orderBy('start_time')])
+                ->first();
+
+            $events = $room?->events ?? collect();
+
+            return [
+                'room_id' => $room?->id,
+                'keyword' => $keyword,
+                'name' => $room?->room_name ?? "Ruang {$keyword}",
+                'exists' => $room !== null,
+                'capacity' => $room?->capacity,
+                'events' => $events->map(fn ($event) => [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'start_time' => substr($event->start_time, 0, 5),
+                    'end_time' => substr($event->end_time, 0, 5),
+                    'status' => $event->status,
+                    'execution_status' => $event->execution_status,
+                ])->values()->all(),
+            ];
+        })->values()->all();
+
         // -----------------------------------------------------------------
         // 1. DASHBOARD KHUSUS ROLE PIC (PENANGGUNG JAWAB RUANGAN)
         // -----------------------------------------------------------------
@@ -96,6 +125,7 @@ class DashboardController extends ApiController
                     'unread_notifications_count' => $unreadNotificationsCount,
                 ],
                 'assigned_rooms' => RoomResource::collection($assignedRooms),
+                'featured_room_schedules' => $featuredRoomSchedules,
                 'recent_events' => EventResource::collection($recentEvents),
                 'recent_complaints' => ComplaintResource::collection($recentComplaints),
                 'recent_notifications' => NotificationResource::collection($notifications),
@@ -159,6 +189,7 @@ class DashboardController extends ApiController
                     'unread_notifications_count' => $unreadNotificationsCount,
                 ],
                 'recent_events' => EventResource::collection($recentEvents),
+                'featured_room_schedules' => $featuredRoomSchedules,
                 'recent_complaints' => ComplaintResource::collection($recentComplaints),
                 'recent_notifications' => NotificationResource::collection($notifications),
             ], "Dashboard {$role} berhasil dimuat.");
@@ -170,6 +201,7 @@ class DashboardController extends ApiController
         // Admin fallback
         return $this->sendResponse([
             'role' => $role,
+            'featured_room_schedules' => $featuredRoomSchedules,
             'stats' => [
                 'total_rooms' => Room::count(),
                 'today_events' => Event::whereDate('event_date', today())->whereIn('status', ['Pending', 'Disetujui'])->count(),
