@@ -218,11 +218,36 @@
                                 <textarea id="repair_note_{{ $complaint->id }}" name="repair_note" rows="2" placeholder="Tuliskan keterangan perbaikan..." style="width:100%; min-height:36px; resize:vertical; padding:6px 10px; font-size:12.5px;">{{ old('repair_note', $complaint->repair_note) }}</textarea>
                             </div>
 
-                            <div id="repair_photo_wrap_{{ $complaint->id }}" class="repair-photo-wrapper" style="flex:1 1 240px; min-width:200px; display:none;">
-                                <label for="repair_photo_{{ $complaint->id }}" style="margin:0 0 4px; font-size:11.5px; color:#6d7788;">
-                                    Bukti Foto Selesai (Kamera/File) <span style="font-size:11px; color:#64748b; font-weight:normal;">(Opsional, maks 5 MB)</span>
+                            <div id="repair_photo_wrap_{{ $complaint->id }}" class="repair-photo-wrapper" style="flex:1 1 100%; display:none; margin-top:8px;">
+                                <label style="margin:0 0 6px; font-size:12px; font-weight:600; color:#465a73;">
+                                    Bukti Foto Selesai <span style="font-size:11px; color:#64748b; font-weight:normal;">(Opsional, otomatis dikompres)</span>
                                 </label>
-                                <input id="repair_photo_{{ $complaint->id }}" type="file" name="repair_photo" accept="image/*" capture="environment" style="width:100%; font-size:12px;">
+                                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                                    <button type="button" class="btn ghost btn-choose-repair-file" data-id="{{ $complaint->id }}" style="min-height:34px; font-size:12px; padding:4px 12px;">
+                                        📁 Pilih dari File
+                                    </button>
+                                    <button type="button" class="btn btn-open-repair-camera" data-id="{{ $complaint->id }}" style="min-height:34px; font-size:12px; padding:4px 12px; background:#1e293b; color:#fff;">
+                                        📷 Ambil dari Kamera
+                                    </button>
+                                </div>
+                                <input id="repair_photo_{{ $complaint->id }}" type="file" name="repair_photo" accept="image/*" capture="environment" hidden class="repair-photo-input" data-id="{{ $complaint->id }}">
+
+                                <div id="repair_camera_panel_{{ $complaint->id }}" hidden style="margin-top:10px; padding:10px; background:#0f172a; border-radius:10px; max-width:440px;">
+                                    <video id="repair_camera_preview_{{ $complaint->id }}" autoplay playsinline style="display:block; width:100%; max-height:280px; background:#000; border-radius:6px; object-fit:contain;"></video>
+                                    <div style="display:flex; gap:8px; margin-top:8px;">
+                                        <button type="button" class="btn btn-take-repair-photo" data-id="{{ $complaint->id }}" style="flex:1; background:#16a34a; color:#fff; min-height:34px; font-size:12px;">📸 Jepret Foto</button>
+                                        <button type="button" class="btn ghost btn-close-repair-camera" data-id="{{ $complaint->id }}" style="color:#f8fafc; border-color:#475569; min-height:34px; font-size:12px;">Tutup Kamera</button>
+                                    </div>
+                                    <p id="repair_camera_error_{{ $complaint->id }}" class="error" style="margin-top:6px; font-size:11.5px; color:#fca5a5;" hidden></p>
+                                </div>
+
+                                <div id="repair_preview_wrap_{{ $complaint->id }}" hidden style="margin-top:8px; display:flex; align-items:center; gap:10px;">
+                                    <img id="repair_photo_preview_{{ $complaint->id }}" alt="Pratinjau foto perbaikan" style="width:72px; height:72px; object-fit:cover; border-radius:8px; border:2px solid #86efac;">
+                                    <div>
+                                        <p id="repair_photo_status_{{ $complaint->id }}" style="margin:0; font-size:11.5px; color:#166534; font-weight:600;"></p>
+                                        <button type="button" class="btn ghost btn-remove-repair-photo" data-id="{{ $complaint->id }}" style="min-height:26px; padding:2px 8px; font-size:11px; color:#dc2626; border-color:#fca5a5; margin-top:4px;">Hapus Foto</button>
+                                    </div>
+                                </div>
                             </div>
 
                             <div style="align-self:flex-end;">
@@ -285,6 +310,223 @@
                 if (photoWrap) {
                     photoWrap.style.display = isRepaired ? 'block' : 'none';
                 }
+            });
+        });
+
+        // ========================================================
+        // KAMERA LANGSUNG & KOMPRESI OTOMATIS BUKTI PERBAIKAN (DESKTOP)
+        // ========================================================
+        var activeStreams = {};
+
+        function formatBytes(bytes) {
+            if (!bytes || bytes <= 0) return '0 B';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(2) + ' MB';
+        }
+
+        function compressImageFile(file, onComplete) {
+            if (!window.FileReader || !window.HTMLCanvasElement || !file.type.startsWith('image/')) {
+                onComplete(file, file.size, file.size);
+                return;
+            }
+
+            var reader = new FileReader();
+            reader.onerror = function () { onComplete(file, file.size, file.size); };
+            reader.onload = function (e) {
+                var img = new Image();
+                img.onerror = function () { onComplete(file, file.size, file.size); };
+                img.onload = function () {
+                    try {
+                        var maxDim = 1200;
+                        var width = img.naturalWidth || img.width;
+                        var height = img.naturalHeight || img.height;
+                        var scale = Math.min(1, maxDim / width, maxDim / height);
+                        var targetWidth = Math.max(1, Math.round(width * scale));
+                        var targetHeight = Math.max(1, Math.round(height * scale));
+
+                        var canvas = document.createElement('canvas');
+                        canvas.width = targetWidth;
+                        canvas.height = targetHeight;
+                        var ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, targetWidth, targetHeight);
+                        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+                        canvas.toBlob(function (blob) {
+                            if (!blob) {
+                                onComplete(file, file.size, file.size);
+                                return;
+                            }
+                            var baseName = file.name ? file.name.replace(/\.[^/.]+$/, '') : 'bukti_perbaikan';
+                            var compressedFile = new File([blob], baseName + '.jpg', { type: 'image/jpeg' });
+                            onComplete(compressedFile, file.size, blob.size);
+                        }, 'image/jpeg', 0.75);
+                    } catch (err) {
+                        onComplete(file, file.size, file.size);
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setRepairPhoto(id, file, origSize, compSize) {
+            var input = document.getElementById('repair_photo_' + id);
+            var previewWrap = document.getElementById('repair_preview_wrap_' + id);
+            var previewImg = document.getElementById('repair_photo_preview_' + id);
+            var statusTxt = document.getElementById('repair_photo_status_' + id);
+
+            if (!input || !previewWrap || !previewImg || !statusTxt) return;
+
+            try {
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+            } catch (e) {
+                // Fallback jika DataTransfer tidak didukung
+            }
+
+            if (previewImg.dataset.objectUrl) {
+                URL.revokeObjectURL(previewImg.dataset.objectUrl);
+            }
+            var objUrl = URL.createObjectURL(file);
+            previewImg.src = objUrl;
+            previewImg.dataset.objectUrl = objUrl;
+
+            if (origSize && compSize && origSize > compSize) {
+                var pct = Math.round(((origSize - compSize) / origSize) * 100);
+                statusTxt.innerHTML = '⚡ Foto siap (' + formatBytes(compSize) + ') <span style="display:inline-block; padding:1px 6px; border-radius:4px; background:#ecfdf5; color:#065f46; font-size:10.5px;">Hemat ' + pct + '%</span>';
+            } else {
+                statusTxt.textContent = 'Foto siap (' + formatBytes(file.size) + ')';
+            }
+
+            previewWrap.hidden = false;
+        }
+
+        function stopRepairCamera(id) {
+            if (activeStreams[id]) {
+                activeStreams[id].getTracks().forEach(function (t) { t.stop(); });
+                delete activeStreams[id];
+            }
+            var panel = document.getElementById('repair_camera_panel_' + id);
+            if (panel) panel.hidden = true;
+        }
+
+        // Tombol Pilih File
+        document.querySelectorAll('.btn-choose-repair-file').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = this.dataset.id;
+                stopRepairCamera(id);
+                var input = document.getElementById('repair_photo_' + id);
+                if (input) input.click();
+            });
+        });
+
+        // Input file change -> otomatis kompres
+        document.querySelectorAll('.repair-photo-input').forEach(function (input) {
+            input.addEventListener('change', function () {
+                var id = this.dataset.id;
+                if (!this.files || !this.files.length) return;
+                var file = this.files[0];
+                var statusTxt = document.getElementById('repair_photo_status_' + id);
+                var previewWrap = document.getElementById('repair_preview_wrap_' + id);
+                if (statusTxt && previewWrap) {
+                    statusTxt.textContent = 'Mengompres foto otomatis...';
+                    previewWrap.hidden = false;
+                }
+                compressImageFile(file, function (compFile, origSize, compSize) {
+                    setRepairPhoto(id, compFile, origSize, compSize);
+                });
+            });
+        });
+
+        // Tombol Buka Kamera
+        document.querySelectorAll('.btn-open-repair-camera').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                var id = this.dataset.id;
+                var errEl = document.getElementById('repair_camera_error_' + id);
+                var panel = document.getElementById('repair_camera_panel_' + id);
+                var video = document.getElementById('repair_camera_preview_' + id);
+                if (errEl) errEl.hidden = true;
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    if (errEl) {
+                        errEl.textContent = 'Akses kamera langsung membutuhkan HTTPS atau localhost. Silakan gunakan tombol "Pilih dari File".';
+                        errEl.hidden = false;
+                    }
+                    return;
+                }
+
+                stopRepairCamera(id);
+
+                try {
+                    var stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' } },
+                        audio: false
+                    });
+                    activeStreams[id] = stream;
+                    if (video) video.srcObject = stream;
+                    if (panel) panel.hidden = false;
+                } catch (err) {
+                    if (errEl) {
+                        errEl.textContent = err.name === 'NotAllowedError'
+                            ? 'Izin kamera ditolak. Berikan izin kamera di browser untuk melanjutkan.'
+                            : 'Kamera tidak dapat diakses. Pastikan kamera tidak sedang dipakai aplikasi lain.';
+                        errEl.hidden = false;
+                    }
+                    if (panel) panel.hidden = false;
+                }
+            });
+        });
+
+        // Tombol Jepret Foto Kamera
+        document.querySelectorAll('.btn-take-repair-photo').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = this.dataset.id;
+                var stream = activeStreams[id];
+                var video = document.getElementById('repair_camera_preview_' + id);
+                var errEl = document.getElementById('repair_camera_error_' + id);
+
+                if (!stream || !video || !video.videoWidth) {
+                    if (errEl) {
+                        errEl.textContent = 'Kamera belum siap, tunggu sebentar lalu coba lagi.';
+                        errEl.hidden = false;
+                    }
+                    return;
+                }
+
+                var canvas = document.createElement('canvas');
+                var maxDim = 1200;
+                var scale = Math.min(1, maxDim / video.videoWidth, maxDim / video.videoHeight);
+                canvas.width = Math.round(video.videoWidth * scale);
+                canvas.height = Math.round(video.videoHeight * scale);
+                canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob(function (blob) {
+                    if (!blob) return;
+                    var file = new File([blob], 'bukti_perbaikan_kamera.jpg', { type: 'image/jpeg' });
+                    setRepairPhoto(id, file, blob.size * 2, blob.size);
+                    stopRepairCamera(id);
+                }, 'image/jpeg', 0.75);
+            });
+        });
+
+        // Tombol Tutup Kamera
+        document.querySelectorAll('.btn-close-repair-camera').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                stopRepairCamera(this.dataset.id);
+            });
+        });
+
+        // Tombol Hapus Foto
+        document.querySelectorAll('.btn-remove-repair-photo').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = this.dataset.id;
+                var input = document.getElementById('repair_photo_' + id);
+                var previewWrap = document.getElementById('repair_preview_wrap_' + id);
+                if (input) input.value = '';
+                if (previewWrap) previewWrap.hidden = true;
             });
         });
     })();
