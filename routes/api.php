@@ -75,10 +75,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/complaints', [ComplaintController::class, 'index'])->name('api.complaints.index');
     Route::post('/complaints', [ComplaintController::class, 'store'])->name('api.complaints.store');
     Route::get('/complaints/{complaint}', [ComplaintController::class, 'show'])->name('api.complaints.show');
-    Route::patch('/complaints/{complaint}/status', [ComplaintController::class, 'updateStatus'])->name('api.complaints.status');
+    Route::match(['patch', 'post'], '/complaints/{complaint}/status', [ComplaintController::class, 'updateStatus'])->name('api.complaints.status');
     Route::post('/complaints/{complaint}/photo', [ComplaintController::class, 'updatePhoto'])->name('api.complaints.photo');
     Route::delete('/complaints/{complaint}', [ComplaintController::class, 'destroy'])->name('api.complaints.destroy');
     Route::get('/complaints/{complaint}/photo', [ComplaintController::class, 'photo'])->name('api.complaints.photo.stream');
+    Route::get('/complaints/{complaint}/repair-photo', [ComplaintController::class, 'repairPhoto'])->name('api.complaints.repair-photo.stream');
 
     // Laporan Pengaduan Khusus PIC
     // Rekap laporan pengaduan berdasarkan periode (harian, mingguan, bulanan) untuk ruangan yang dipegang PIC

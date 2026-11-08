@@ -30,6 +30,16 @@ class ComplaintController extends Controller
                         $table->text('repair_note')->nullable()->after('status_repair');
                     });
                 }
+                if (! Schema::hasColumn('complaints', 'repair_photo_path')) {
+                    Schema::table('complaints', function (Blueprint $table) {
+                        $table->string('repair_photo_path', 2048)->nullable()->after('repair_note');
+                    });
+                }
+                if (! Schema::hasColumn('complaints', 'repair_photo_data')) {
+                    Schema::table('complaints', function (Blueprint $table) {
+                        $table->longText('repair_photo_data')->nullable()->after('repair_photo_path');
+                    });
+                }
                 if (! Schema::hasColumn('complaints', 'photo_data')) {
                     Schema::table('complaints', function (Blueprint $table) {
                         $table->longText('photo_data')->nullable()->after('photo_path');
@@ -192,6 +202,45 @@ class ComplaintController extends Controller
         );
     }
 
+    /** Stream a repair proof photo to authorized users. */
+    // Menampilkan file foto bukti perbaikan fasilitas secara aman.
+    public function showRepairPhoto(Request $request, Complaint $complaint): StreamedResponse
+    {
+        $user = $request->user();
+        $role = $user->role?->role_name;
+        $isAssignedPic = ($complaint->room && (int) $complaint->room->pic_id === (int) $user->id)
+            || $complaint->room()->where('pic_id', $user->id)->exists();
+        $canView = $role === 'Admin'
+            || ($role === 'PIC' && $isAssignedPic)
+            || (in_array($role, ['Guru', 'Organisasi']) && (int) $complaint->reporter_id === (int) $user->id);
+
+        abort_unless($canView, 403);
+
+        $cleanPath = app(ImageCompressionService::class)->resolveComplaintRepairPhotoPath($complaint);
+        abort_unless($cleanPath !== null, 404, 'File foto bukti perbaikan tidak ditemukan di penyimpanan server.');
+
+        $disk = Storage::disk('public');
+        $fullPath = $disk->path($cleanPath);
+
+        $mime = 'image/jpeg';
+        try {
+            $mime = $disk->mimeType($cleanPath) ?: (file_exists($fullPath) ? (mime_content_type($fullPath) ?: 'image/jpeg') : 'image/jpeg');
+        } catch (\Throwable $e) {
+            $mime = 'image/jpeg';
+        }
+
+        $headers = ['Content-Type' => $mime];
+        if (file_exists($fullPath)) {
+            $headers['Content-Length'] = (string) filesize($fullPath);
+        }
+
+        return $disk->response(
+            $cleanPath,
+            headers: $headers,
+            disposition: 'inline'
+        );
+    }
+
     /** Display complaint form with camera-capable image input. */
     // Menampilkan form pembuatan laporan pengaduan fasilitas baru.
     public function create(Request $request): View
@@ -286,7 +335,7 @@ class ComplaintController extends Controller
     }
 
     /** Let the PIC responsible for the room change a complaint to a permitted repair state. */
-    // Mengubah status perbaikan oleh PIC ruangan ('Belum Diperbaiki', 'Menunggu Spare Part', 'Sudah Diperbaiki') beserta catatan keterangan perbaikan.
+    // Mengubah status perbaikan oleh PIC ruangan ('Belum Diperbaiki', 'Menunggu Spare Part', 'Sudah Diperbaiki') beserta bukti foto & catatan keterangan perbaikan.
     public function updateStatus(Request $request, Complaint $complaint): RedirectResponse
     {
         abort_unless(
@@ -294,13 +343,29 @@ class ComplaintController extends Controller
                 && (int) $complaint->room->pic_id === (int) $request->user()->id,
             403,
         );
-        // Validasi status perbaikan dan catatan keterangan (keterangan bersifat opsional)
+
+        // Aturan perubahan status (one-way workflow):
+        // 1. Jika sudah "Sudah Diperbaiki", status terkunci dan tidak bisa diubah kembali
+        if ($complaint->status_repair === 'Sudah Diperbaiki') {
+            return back()->withErrors(['status_repair' => 'Pengaduan yang telah diperbaiki tidak dapat diubah statusnya lagi.']);
+        }
+
+        // Validasi status perbaikan, bukti foto hasil perbaikan, dan catatan keterangan
         $data = $request->validate([
             'status_repair' => ['required', 'in:Belum Diperbaiki,Menunggu Spare Part,Sudah Diperbaiki'],
             'repair_note' => ['nullable', 'string', 'max:2000'],
+            'repair_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ], [
             'repair_note.max' => 'Keterangan perbaikan maksimal 2000 karakter.',
+            'repair_photo.image' => 'File bukti perbaikan harus berupa gambar.',
+            'repair_photo.mimes' => 'Format foto bukti perbaikan harus JPG, PNG, atau WebP.',
+            'repair_photo.max' => 'Ukuran foto bukti perbaikan maksimal 5 MB.',
         ]);
+
+        // 2. Jika status saat ini "Menunggu Spare Part", tidak boleh mundur kembali ke "Belum Diperbaiki"
+        if ($complaint->status_repair === 'Menunggu Spare Part' && $data['status_repair'] === 'Belum Diperbaiki') {
+            return back()->withErrors(['status_repair' => 'Status yang sudah Menunggu Spare Part tidak dapat dikembalikan ke Belum Diperbaiki.']);
+        }
 
         $this->ensureRepairNoteColumnExists();
 
@@ -314,6 +379,25 @@ class ComplaintController extends Controller
 
         if ($hasRepairNoteColumn && ($data['status_repair'] === 'Sudah Diperbaiki' || array_key_exists('repair_note', $data))) {
             $updateData['repair_note'] = $data['repair_note'] ?? null;
+        }
+
+        // Jika status diubah menjadi "Sudah Diperbaiki" dan menyertakan foto bukti perbaikan
+        if ($data['status_repair'] === 'Sudah Diperbaiki' && $request->hasFile('repair_photo')) {
+            $oldRepairPhoto = $complaint->repair_photo_path;
+            $newRepairPhotoPath = $this->storeCompressedPhoto($data['repair_photo']);
+            $updateData['repair_photo_path'] = $newRepairPhotoPath;
+
+            try {
+                if (Schema::hasColumn('complaints', 'repair_photo_data')) {
+                    $updateData['repair_photo_data'] = app(ImageCompressionService::class)->encodePhotoFromDisk($newRepairPhotoPath);
+                }
+            } catch (\Throwable $e) {
+                // Abaikan jika encode gagal
+            }
+
+            if ($oldRepairPhoto) {
+                Storage::disk('public')->delete($oldRepairPhoto);
+            }
         }
 
         $complaint->update($updateData);

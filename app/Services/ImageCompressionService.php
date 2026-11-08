@@ -233,6 +233,75 @@ class ImageCompressionService
     }
 
     /**
+     * Menemukan atau memulihkan file foto bukti perbaikan pengaduan di disk 'public'.
+     */
+    public function resolveComplaintRepairPhotoPath(\App\Models\Complaint $complaint): ?string
+    {
+        $rawPath = trim((string) $complaint->repair_photo_path);
+        if ($rawPath === '') {
+            return null;
+        }
+
+        $cleanPath = str_replace('\\', '/', $rawPath);
+        $cleanPath = preg_replace('#^(public/|storage/|app/public/)+#i', '', $cleanPath);
+        $cleanPath = ltrim((string) $cleanPath, '/');
+
+        if ($cleanPath === '') {
+            return null;
+        }
+
+        $disk = Storage::disk('public');
+
+        // 1. Jika sudah ada di disk 'public', langsung kembalikan path-nya
+        if ($disk->exists($cleanPath)) {
+            return $cleanPath;
+        }
+
+        // 2. Cek berbagai kemungkinan lokasi path fisik di server
+        $basename = basename($cleanPath);
+        $candidates = [
+            $disk->path($rawPath),
+            storage_path('app/public/' . $cleanPath),
+            storage_path('app/public/complaints/' . $basename),
+            public_path('storage/' . $cleanPath),
+            public_path('storage/complaints/' . $basename),
+            public_path($cleanPath),
+            storage_path('app/' . $cleanPath),
+            base_path('storage/app/public/' . $cleanPath),
+            base_path('storage/app/public/complaints/' . $basename),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && $candidate !== '' && file_exists($candidate) && is_file($candidate)) {
+                try {
+                    $bytes = @file_get_contents($candidate);
+                    if (is_string($bytes) && $bytes !== '') {
+                        $disk->put($cleanPath, $bytes);
+                        return $cleanPath;
+                    }
+                } catch (\Throwable $e) {
+                    // Lanjut ke kandidat berikutnya
+                }
+            }
+        }
+
+        // 3. Fallback terakhir: jika file fisik hilang, pulihkan dari kolom base64 'repair_photo_data'
+        if (! empty($complaint->repair_photo_data)) {
+            $decoded = base64_decode((string) $complaint->repair_photo_data, true);
+            if (is_string($decoded) && $decoded !== '') {
+                try {
+                    $disk->put($cleanPath, $decoded);
+                    return $cleanPath;
+                } catch (\Throwable $e) {
+                    // Abaikan jika gagal menulis
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Memperbaiki orientasi foto berdasarkan metadata EXIF dari kamera HP.
      */
     protected function fixExifOrientation($image, string $filePath)

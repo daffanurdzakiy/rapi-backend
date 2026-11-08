@@ -26,6 +26,16 @@ class AppServiceProvider extends ServiceProvider
                         $table->text('repair_note')->nullable()->after('status_repair');
                     });
                 }
+                if (! \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'repair_photo_path')) {
+                    \Illuminate\Support\Facades\Schema::table('complaints', function (\Illuminate\Database\Schema\Blueprint $table) {
+                        $table->string('repair_photo_path', 2048)->nullable()->after('repair_note');
+                    });
+                }
+                if (! \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'repair_photo_data')) {
+                    \Illuminate\Support\Facades\Schema::table('complaints', function (\Illuminate\Database\Schema\Blueprint $table) {
+                        $table->longText('repair_photo_data')->nullable()->after('repair_photo_path');
+                    });
+                }
                 if (! \Illuminate\Support\Facades\Schema::hasColumn('complaints', 'photo_data')) {
                     \Illuminate\Support\Facades\Schema::table('complaints', function (\Illuminate\Database\Schema\Blueprint $table) {
                         $table->longText('photo_data')->nullable()->after('photo_path');

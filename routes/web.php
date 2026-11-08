@@ -54,9 +54,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/agenda/cek-ketersediaan', [EventController::class, 'checkAvailability'])->name('events.check-availability');
     Route::post('/agenda', [EventController::class, 'store'])->name('events.store');
 
-    // Fitur Pengaduan Sarana & Prasarana (Lihat daftar dan tampilkan foto bukti kerusakan)
+    // Fitur Pengaduan Sarana & Prasarana (Lihat daftar dan tampilkan foto bukti kerusakan & bukti perbaikan)
     Route::get('/pengaduan', [ComplaintController::class, 'index'])->name('complaints.index');
     Route::get('/pengaduan/{complaint}/foto', [ComplaintController::class, 'showPhoto'])->name('complaints.show-photo');
+    Route::get('/pengaduan/{complaint}/foto-perbaikan', [ComplaintController::class, 'showRepairPhoto'])->name('complaints.show-repair-photo');
 
     // Fitur Laporan Pengaduan khusus untuk Role PIC (Person In Charge)
     Route::get('/pic/laporan-pengaduan', [PicComplaintReportController::class, 'index'])->name('pic.complaint-reports.index');
@@ -66,7 +67,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/pengaduan/buat', [ComplaintController::class, 'create'])->name('complaints.create');
     Route::post('/pengaduan', [ComplaintController::class, 'store'])->name('complaints.store');
     Route::patch('/pengaduan/{complaint}/foto', [ComplaintController::class, 'updatePhoto'])->name('complaints.photo');
-    Route::patch('/pengaduan/{complaint}/status', [ComplaintController::class, 'updateStatus'])->name('complaints.status');
+    Route::match(['patch', 'post'], '/pengaduan/{complaint}/status', [ComplaintController::class, 'updateStatus'])->name('complaints.status');
     Route::delete('/pengaduan/{complaint}', [ComplaintController::class, 'destroy'])->name('complaints.destroy');
 
     // Aksi Persetujuan / Penolakan Agenda Peminjaman Ruangan oleh PIC atau Admin
