@@ -189,57 +189,50 @@
                 @endif
 
                 {{-- Formulir Pembaruan Status oleh PIC --}}
-                @if(auth()->user()->role?->role_name === 'PIC' && (int) $complaint->room->pic_id === (int) auth()->id())
-                    @if($complaint->status_repair === 'Sudah Diperbaiki')
-                        <div style="margin-top:14px; padding:10px 14px; border-radius:8px; background:#f0fdf4; border:1px solid #bbf7d0; display:flex; align-items:center; gap:8px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                            <span style="font-size:12.5px; font-weight:600; color:#166534;">Perbaikan fasilitas telah selesai dan status telah terkunci permanen.</span>
+                @if(auth()->user()->role?->role_name === 'PIC' && (int) $complaint->room->pic_id === (int) auth()->id() && $complaint->status_repair !== 'Sudah Diperbaiki')
+                    <form method="post" action="{{ route('complaints.status', $complaint) }}" enctype="multipart/form-data" style="margin-top:14px; padding:12px 14px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0;">
+                        @csrf
+                        @method('PATCH')
+                        <div style="font-size:12px; font-weight:700; color:#465a73; margin-bottom:8px;">
+                            Perbarui Status Pengerjaan:
                         </div>
-                    @else
-                        <form method="post" action="{{ route('complaints.status', $complaint) }}" enctype="multipart/form-data" style="margin-top:14px; padding:12px 14px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0;">
-                            @csrf
-                            @method('PATCH')
-                            <div style="font-size:12px; font-weight:700; color:#465a73; margin-bottom:8px;">
-                                Perbarui Status Pengerjaan:
+                        <div style="display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px;">
+                            <div style="flex:0 0 220px; min-width:180px;">
+                                <label for="status_repair_{{ $complaint->id }}" style="margin:0 0 4px; font-size:11.5px; color:#6d7788;">Pilih Status</label>
+                                <select id="status_repair_{{ $complaint->id }}" name="status_repair" class="status-repair-select" data-note-id="repair_note_wrap_{{ $complaint->id }}" data-photo-id="repair_photo_wrap_{{ $complaint->id }}" style="width:100%; min-height:36px;">
+                                    @if($complaint->status_repair === 'Belum Diperbaiki')
+                                        <option value="Belum Diperbaiki" selected>Belum Diperbaiki</option>
+                                        <option value="Menunggu Spare Part">Menunggu Spare Part</option>
+                                        <option value="Sudah Diperbaiki">Sudah Diperbaiki</option>
+                                    @elseif($complaint->status_repair === 'Menunggu Spare Part')
+                                        <option value="Menunggu Spare Part" selected>Menunggu Spare Part</option>
+                                        <option value="Sudah Diperbaiki">Sudah Diperbaiki</option>
+                                    @endif
+                                </select>
                             </div>
-                            <div style="display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px;">
-                                <div style="flex:0 0 220px; min-width:180px;">
-                                    <label for="status_repair_{{ $complaint->id }}" style="margin:0 0 4px; font-size:11.5px; color:#6d7788;">Pilih Status</label>
-                                    <select id="status_repair_{{ $complaint->id }}" name="status_repair" class="status-repair-select" data-note-id="repair_note_wrap_{{ $complaint->id }}" data-photo-id="repair_photo_wrap_{{ $complaint->id }}" style="width:100%; min-height:36px;">
-                                        @if($complaint->status_repair === 'Belum Diperbaiki')
-                                            <option value="Belum Diperbaiki" selected>Belum Diperbaiki</option>
-                                            <option value="Menunggu Spare Part">Menunggu Spare Part</option>
-                                            <option value="Sudah Diperbaiki">Sudah Diperbaiki</option>
-                                        @elseif($complaint->status_repair === 'Menunggu Spare Part')
-                                            <option value="Menunggu Spare Part" selected>Menunggu Spare Part</option>
-                                            <option value="Sudah Diperbaiki">Sudah Diperbaiki</option>
-                                        @endif
-                                    </select>
-                                </div>
 
-                                <div id="repair_note_wrap_{{ $complaint->id }}" class="repair-note-wrapper" style="flex:1 1 260px; min-width:220px; display:none;">
-                                    <label for="repair_note_{{ $complaint->id }}" style="margin:0 0 4px; font-size:11.5px; color:#6d7788;">
-                                        Keterangan Selesai <span style="font-size:11px; color:#64748b; font-weight:normal;">(Opsional)</span>
-                                    </label>
-                                    <textarea id="repair_note_{{ $complaint->id }}" name="repair_note" rows="2" placeholder="Tuliskan keterangan perbaikan..." style="width:100%; min-height:36px; resize:vertical; padding:6px 10px; font-size:12.5px;">{{ old('repair_note', $complaint->repair_note) }}</textarea>
-                                </div>
-
-                                <div id="repair_photo_wrap_{{ $complaint->id }}" class="repair-photo-wrapper" style="flex:1 1 240px; min-width:200px; display:none;">
-                                    <label for="repair_photo_{{ $complaint->id }}" style="margin:0 0 4px; font-size:11.5px; color:#6d7788;">
-                                        Bukti Foto Selesai <span style="font-size:11px; color:#64748b; font-weight:normal;">(Opsional, maks 5 MB)</span>
-                                    </label>
-                                    <input id="repair_photo_{{ $complaint->id }}" type="file" name="repair_photo" accept="image/jpeg,image/png,image/webp" style="width:100%; font-size:12px;">
-                                </div>
-
-                                <div style="align-self:flex-end;">
-                                    <button class="btn" style="min-height:36px; font-size:12.5px;">Perbarui Status</button>
-                                </div>
+                            <div id="repair_note_wrap_{{ $complaint->id }}" class="repair-note-wrapper" style="flex:1 1 260px; min-width:220px; display:none;">
+                                <label for="repair_note_{{ $complaint->id }}" style="margin:0 0 4px; font-size:11.5px; color:#6d7788;">
+                                    Keterangan Selesai <span style="font-size:11px; color:#64748b; font-weight:normal;">(Opsional)</span>
+                                </label>
+                                <textarea id="repair_note_{{ $complaint->id }}" name="repair_note" rows="2" placeholder="Tuliskan keterangan perbaikan..." style="width:100%; min-height:36px; resize:vertical; padding:6px 10px; font-size:12.5px;">{{ old('repair_note', $complaint->repair_note) }}</textarea>
                             </div>
-                            @error('status_repair')<p class="error" style="margin-top:6px;">{{ $message }}</p>@enderror
-                            @error('repair_note')<p class="error" style="margin-top:6px;">{{ $message }}</p>@enderror
-                            @error('repair_photo')<p class="error" style="margin-top:6px;">{{ $message }}</p>@enderror
-                        </form>
-                    @endif
+
+                            <div id="repair_photo_wrap_{{ $complaint->id }}" class="repair-photo-wrapper" style="flex:1 1 240px; min-width:200px; display:none;">
+                                <label for="repair_photo_{{ $complaint->id }}" style="margin:0 0 4px; font-size:11.5px; color:#6d7788;">
+                                    Bukti Foto Selesai (Kamera/File) <span style="font-size:11px; color:#64748b; font-weight:normal;">(Opsional, maks 5 MB)</span>
+                                </label>
+                                <input id="repair_photo_{{ $complaint->id }}" type="file" name="repair_photo" accept="image/*" capture="environment" style="width:100%; font-size:12px;">
+                            </div>
+
+                            <div style="align-self:flex-end;">
+                                <button class="btn" style="min-height:36px; font-size:12.5px;">Perbarui Status</button>
+                            </div>
+                        </div>
+                        @error('status_repair')<p class="error" style="margin-top:6px;">{{ $message }}</p>@enderror
+                        @error('repair_note')<p class="error" style="margin-top:6px;">{{ $message }}</p>@enderror
+                        @error('repair_photo')<p class="error" style="margin-top:6px;">{{ $message }}</p>@enderror
+                    </form>
                 @endif
 
                 @if(isset($whatsappWarnings[$complaint->id]))
