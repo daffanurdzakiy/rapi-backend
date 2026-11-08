@@ -205,17 +205,8 @@
                     </div>
                 </form>
             @endif
-            @if(auth()->user()->role?->role_name === 'Admin')
-                @if(in_array($event->status, ['Pending', 'Disetujui']))
-                    <a class="btn ghost" href="{{ route('events.edit', $event) }}">Edit</a>
-                @endif
-                @if($event->status === 'Disetujui')
-                    <form method="post" action="{{ route('events.destroy', $event) }}" style="display:inline" onsubmit="return confirm('Hapus agenda yang disetujui ini?')">
-                        @csrf
-                        @method('DELETE')
-                        <button class="btn danger">Hapus Agenda</button>
-                    </form>
-                @endif
+            @if(auth()->user()->role?->role_name === 'Admin' && in_array($event->status, ['Pending', 'Disetujui']))
+                <a class="btn ghost" href="{{ route('events.edit', $event) }}">Edit</a>
             @endif
         </div>
     @empty
