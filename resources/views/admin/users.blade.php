@@ -1,13 +1,14 @@
 @extends('layouts.app')
 @section('content')
 <style>
-    .users-toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:4px 0 18px; }
+    .users-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px; margin:4px 0 18px; }
     .users-toolbar .card { margin:0; }
-    .users-actions-group { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .users-actions-group { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1 1 auto; }
     .add-user-card, .import-user-card { flex:0 0 auto; padding:0; margin:0; border:none; }
-    .add-user-card > summary, .import-user-card > summary { list-style:none; }
+    .add-user-card[open], .import-user-card[open] { flex:1 1 100%; width:100%; }
+    .add-user-card > summary, .import-user-card > summary { list-style:none; width:fit-content; }
     .add-user-card > summary::-webkit-details-marker, .import-user-card > summary::-webkit-details-marker { display:none; }
-    .add-user-card form, .import-user-card form { min-width:min(620px, calc(100vw - 64px)); margin-top:14px; }
+    .add-user-card form, .import-user-card form { width:100%; max-width:720px; margin-top:14px; }
     .user-search { display:flex; flex:0 1 380px; align-items:center; gap:8px; }
     .user-search input { min-width:0; }
     .user-search .btn { flex:0 0 auto; }
@@ -148,6 +149,7 @@
 </div>
 
 <div class="card">
+    <div class="report-table-wrap">
     <table>
         <thead>
             <tr>
@@ -242,6 +244,7 @@
             @endforelse
         </tbody>
     </table>
+    </div>
 </div>
 <script>
     document.querySelectorAll('[data-user-dialog]').forEach(function (button) {

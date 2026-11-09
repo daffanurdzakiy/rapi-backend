@@ -80,10 +80,14 @@
             flex: 1 1 auto;
             min-width: 0;
             align-items: stretch;
-            justify-content: center;
+            justify-content: safe center;
             gap: clamp(4px, .6vw, 12px);
             margin: 0 clamp(4px, .8vw, 14px);
-            overflow: visible;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .nav::-webkit-scrollbar {
+            display: none;
         }
         .nav a {
             position: relative;
@@ -466,29 +470,37 @@
                 border-top: 1px solid #e8e1d3;
                 display: flex !important;
                 align-items: center;
-                justify-content: space-around;
+                justify-content: safe center;
+                overflow-x: auto;
+                scrollbar-width: none;
                 z-index: 100;
                 box-shadow: 0 -4px 20px rgba(38, 54, 74, 0.08);
                 backdrop-filter: blur(12px);
-                padding: 0 8px;
+                padding: 0 6px;
+            }
+            .mobile-bottom-nav::-webkit-scrollbar {
+                display: none;
             }
             .mobile-bottom-nav a {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                flex: 1;
+                flex: 1 0 56px;
+                min-width: 56px;
+                padding: 0 4px;
                 height: 100%;
                 color: #7b889b;
                 text-decoration: none;
-                font-size: 11px;
+                font-size: 10.5px;
                 font-weight: 500;
+                white-space: nowrap;
                 gap: 3px;
                 transition: color .18s, transform .18s;
             }
             .mobile-bottom-nav a svg {
-                width: 22px;
-                height: 22px;
+                width: 20px;
+                height: 20px;
                 stroke: currentColor;
                 fill: none;
                 stroke-width: 2;
@@ -508,18 +520,18 @@
             .stats, .grid2 { grid-template-columns: 1fr; }
             .stats { gap: 10px; }
             .stat { min-height: 110px; border-radius: 16px; }
-            .card { padding: 18px; border-radius: 16px; }
+            .card { padding: 16px; border-radius: 16px; }
             .form-grid { grid-template-columns: 1fr; }
             .full { grid-column: auto; }
-            .heading { flex-wrap: wrap; }
-            .heading h1 { font-size: 24px; }
-            .heading p { margin-bottom: 16px; }
+            .heading { flex-wrap: wrap; gap: 12px; }
+            .heading h1 { font-size: 22px; }
+            .heading p { margin-bottom: 12px; }
             .complaint-heading { flex-direction: column; gap: 12px; }
-            .complaint-side { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 10px; }
+            .complaint-side { flex-direction: column; align-items: flex-start !important; width: 100%; gap: 10px; }
             .complaint-item .complaint-heading p { margin-bottom: 0; }
-            .report-table-wrap, .card:has(> table) { overflow-x: auto; }
-            table { min-width: 620px; font-size: 13px; }
-            .dashboard-date { padding: 0 0 12px; }
+            .report-table-wrap, .card:has(> table) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            table { min-width: 600px; font-size: 13px; }
+            .dashboard-date { padding: 0 0 8px; }
             .quick-action { width: 100%; }
         }
     </style>
@@ -591,9 +603,17 @@
                 <span>Kalender</span>
             </a>
             @if($currentRole === 'Admin')
-            <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 <span>Laporan</span>
+            </a>
+            <a href="{{ route('rooms.index') }}" class="{{ request()->routeIs('rooms.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>
+                <span>Ruangan</span>
+            </a>
+            <a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span>Pengguna</span>
             </a>
             @elseif($currentRole === 'PIC')
             <a href="{{ route('pic.complaint-reports.index') }}" class="{{ request()->routeIs('pic.*') ? 'active' : '' }}">

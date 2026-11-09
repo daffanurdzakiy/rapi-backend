@@ -186,28 +186,30 @@
                 </div>
             </div>
 
-            @if(in_array(auth()->user()->role?->role_name, ['Admin', 'Guru', 'Organisasi']) && in_array($event->status, ['Pending', 'Disetujui']))
-                <a class="btn ghost" href="{{ route('complaints.create', ['room_id' => $event->room_id]) }}">Laporkan Kerusakan Ruangan</a>
-            @endif
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:4px;">
+                @if(in_array(auth()->user()->role?->role_name, ['Admin', 'Guru', 'Organisasi']) && in_array($event->status, ['Pending', 'Disetujui']))
+                    <a class="btn ghost" href="{{ route('complaints.create', ['room_id' => $event->room_id]) }}">Laporkan Kerusakan Ruangan</a>
+                @endif
 
-            @if(in_array(auth()->user()->role?->role_name, ['Admin', 'PIC']) && $event->status === 'Pending')
-                <form method="post" action="{{ route('events.decide', $event) }}" style="display:inline">
-                    @csrf
-                    @method('PATCH')
-                    <button class="btn" name="status" value="Disetujui">Setujui</button>
-                    <button class="btn danger" type="button" data-rejection-toggle="{{ $event->id }}">Tolak</button>
-                    <div id="rejection-panel-{{ $event->id }}" @if(!$errors->has('rejection_reason')) hidden @endif style="margin-top:12px;min-width:280px">
-                        <label for="rejection_reason-{{ $event->id }}">Keterangan penolakan</label>
-                        <textarea id="rejection_reason-{{ $event->id }}" name="rejection_reason" rows="2" maxlength="1000" @if(!$errors->has('rejection_reason')) disabled @else required @endif>{{ old('rejection_reason') }}</textarea>
-                        @error('rejection_reason')<p class="error">{{ $message }}</p>@enderror
-                        <input type="hidden" name="status" value="Ditolak" @if(!$errors->has('rejection_reason')) disabled @endif>
-                        <button class="btn danger" type="submit" data-rejection-submit="{{ $event->id }}" @if(!$errors->has('rejection_reason')) disabled @endif>Konfirmasi Tolak</button>
-                    </div>
-                </form>
-            @endif
-            @if(auth()->user()->role?->role_name === 'Admin' && in_array($event->status, ['Pending', 'Disetujui']))
-                <a class="btn ghost" href="{{ route('events.edit', $event) }}">Edit</a>
-            @endif
+                @if(in_array(auth()->user()->role?->role_name, ['Admin', 'PIC']) && $event->status === 'Pending')
+                    <form method="post" action="{{ route('events.decide', $event) }}" style="display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0; flex:1 1 auto;">
+                        @csrf
+                        @method('PATCH')
+                        <button class="btn" name="status" value="Disetujui">Setujui</button>
+                        <button class="btn danger" type="button" data-rejection-toggle="{{ $event->id }}">Tolak</button>
+                        <div id="rejection-panel-{{ $event->id }}" @if(!$errors->has('rejection_reason')) hidden @endif style="flex:1 1 100%; width:100%; margin-top:8px;">
+                            <label for="rejection_reason-{{ $event->id }}">Keterangan penolakan</label>
+                            <textarea id="rejection_reason-{{ $event->id }}" name="rejection_reason" rows="2" maxlength="1000" @if(!$errors->has('rejection_reason')) disabled @else required @endif>{{ old('rejection_reason') }}</textarea>
+                            @error('rejection_reason')<p class="error">{{ $message }}</p>@enderror
+                            <input type="hidden" name="status" value="Ditolak" @if(!$errors->has('rejection_reason')) disabled @endif>
+                            <button class="btn danger" type="submit" data-rejection-submit="{{ $event->id }}" style="margin-top:8px;" @if(!$errors->has('rejection_reason')) disabled @endif>Konfirmasi Tolak</button>
+                        </div>
+                    </form>
+                @endif
+                @if(auth()->user()->role?->role_name === 'Admin' && in_array($event->status, ['Pending', 'Disetujui']))
+                    <a class="btn ghost" href="{{ route('events.edit', $event) }}">Edit</a>
+                @endif
+            </div>
         </div>
     @empty
         <div style="text-align:center; padding:32px 16px;">

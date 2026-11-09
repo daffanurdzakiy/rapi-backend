@@ -23,7 +23,18 @@ class RedirectMobileToFlutterApp
         if (
             $request->isMethod('GET') &&
             ! $request->session()->get('force_desktop', false) &&
-            ! $request->is('api/*', 'm', 'm/*', 'init-storage', 'admin/*', 'ruangan*', 'pengaduan/*/foto', 'pic/laporan-pengaduan/*/foto')
+            $request->user()?->role?->role_name !== 'Admin' &&
+            ! $request->is(
+                'api/*',
+                'm',
+                'm/*',
+                'init-storage',
+                'admin/*',
+                'ruangan*',
+                'pengaduan/*/foto',
+                'pengaduan/*/foto-perbaikan',
+                'pic/laporan-pengaduan/*/foto'
+            )
         ) {
             $userAgent = $request->userAgent() ?? '';
             if (preg_match('/Mobile|Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry|Opera Mini|IEMobile/i', $userAgent)) {

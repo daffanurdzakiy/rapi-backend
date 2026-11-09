@@ -4,7 +4,7 @@
 <style>
     .report-filter { display:flex; flex-wrap:wrap; align-items:end; gap:14px; }
     .report-filter label { margin-top:0; }
-    .report-filter .filter-field { min-width:190px; }
+    .report-filter .filter-field { flex:1 1 200px; min-width:160px; }
     .report-table-wrap { overflow-x:auto; }
     .report-table { min-width:680px; }
     .report-table th, .report-table td { padding:12px 10px; }

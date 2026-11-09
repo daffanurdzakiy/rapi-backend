@@ -67,6 +67,47 @@
         border-color: #fca5a5;
         color: #991b1b;
     }
+
+    .complaint-side-panel {
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+    }
+    .complaint-photos-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 4px;
+    }
+    .complaint-photo-thumb {
+        display: block;
+        width: 150px;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #e8e1d3;
+    }
+    .complaint-photo-thumb.repaired {
+        border: 2px solid #86efac;
+    }
+
+    @media (max-width: 800px) {
+        .complaint-side-panel {
+            align-items: flex-start;
+            width: 100%;
+        }
+        .complaint-photos-wrap {
+            justify-content: flex-start;
+            width: 100%;
+        }
+        .complaint-photo-thumb {
+            width: min(148px, calc(50vw - 38px));
+            height: 112px;
+        }
+    }
 </style>
 
     <div class="heading">
@@ -123,7 +164,7 @@
                             </div>
                         @endif
                     </div>
-                    <div class="complaint-side" style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+                    <div class="complaint-side complaint-side-panel">
                         @php
                             $badgeClass = match($complaint->status_repair) {
                                 'Sudah Diperbaiki' => 'badge-status-repaired',
@@ -141,7 +182,7 @@
                         @endif
 
                         {{-- Tampilan Foto: Bukti Kerusakan di Kiri & Bukti Perbaikan di Kanan --}}
-                        <div style="display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; margin-top:4px;">
+                        <div class="complaint-photos-wrap">
                             @if($complaint->photo_path)
                                 @php($photoUrl = route('complaints.show-photo', $complaint, false))
                                 <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
@@ -150,7 +191,7 @@
                                         <img
                                             src="{{ $photoUrl }}"
                                             alt="Foto kerusakan {{ $complaint->room->room_name }}"
-                                            style="display:block;width:150px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e8e1d3;"
+                                            class="complaint-photo-thumb"
                                         >
                                     </a>
                                 </div>
@@ -164,7 +205,7 @@
                                         <img
                                             src="{{ $repairPhotoUrl }}"
                                             alt="Foto perbaikan {{ $complaint->room->room_name }}"
-                                            style="display:block;width:150px;height:120px;object-fit:cover;border-radius:8px;border:2px solid #86efac;"
+                                            class="complaint-photo-thumb repaired"
                                         >
                                     </a>
                                 </div>
