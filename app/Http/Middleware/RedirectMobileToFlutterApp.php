@@ -6,28 +6,26 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * ============================================================================
- * MIDDLEWARE: RedirectMobileToFlutterApp
- * TUJUAN & FUNGSI:
- * 1. Mendeteksi apakah pengunjung website menggunakan perangkat mobile (HP/Tablet)
- *    berdasarkan string HTTP User-Agent browser.
- * 2. Mengalihkan (redirect) pengguna mobile ke antarmuka aplikasi Flutter Web (/m/)
- *    agar mendapatkan pengalaman pengguna (UX) native yang optimal.
- * 
- * ATURAN & KEBIJAKAN PENTING (DAPAT DIJELASKAN KEPADA PENGUJI):
- * 1. Khusus Role Admin:
- *    - Admin TIDAK PERNAH dialihkan ke /m/ karena menu master data tingkat lanjut
- *      (CRUD Akun Pengguna, Master Ruangan, dsb) memang dikhususkan di Web Utama.
- * 2. Pengecualian Route Teknis:
- *    - Route API (`/api/*`), asset mobile (`/m/*`), streaming foto bukti kerusakan
- *      dan foto perbaikan (`pengaduan/*/foto*`) TIDAK BOLEH dialihkan agar transfer
- *      data dan pemuatan gambar tidak terputus atau loop redirect.
- * 3. Fitur Override Session ('force_desktop'):
- *    - Parameter `?desktop=1` memungkinkan pengguna tetap membuka versi desktop di HP.
- *    - Parameter `?mobile=1` mengembalikan ke versi mobile.
- * ============================================================================
- */
+// ============================================================================
+// MIDDLEWARE: RedirectMobileToFlutterApp
+// TUJUAN & FUNGSI:
+// 1. Mendeteksi apakah pengunjung website menggunakan perangkat mobile (HP/Tablet)
+//    berdasarkan string HTTP User-Agent browser.
+// 2. Mengalihkan (redirect) pengguna mobile ke antarmuka aplikasi Flutter Web (/m/)
+//    agar mendapatkan pengalaman pengguna (UX) native yang optimal.
+//
+// ATURAN & KEBIJAKAN PENTING (DAPAT DIJELASKAN KEPADA PENGUJI):
+// 1. Khusus Role Admin:
+//    - Admin TIDAK PERNAH dialihkan ke /m/ karena menu master data tingkat lanjut
+//      (CRUD Akun Pengguna, Master Ruangan, dsb) memang dikhususkan di Web Utama.
+// 2. Pengecualian Route Teknis:
+//    - Route API (/api/...), asset mobile (/m/...), streaming foto bukti kerusakan
+//      dan foto perbaikan (pengaduan/{id}/foto...) TIDAK BOLEH dialihkan agar transfer
+//      data dan pemuatan gambar tidak terputus atau loop redirect.
+// 3. Fitur Override Session ('force_desktop'):
+//    - Parameter ?desktop=1 memungkinkan pengguna tetap membuka versi desktop di HP.
+//    - Parameter ?mobile=1 mengembalikan ke versi mobile.
+// ============================================================================
 class RedirectMobileToFlutterApp
 {
     /**
