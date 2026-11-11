@@ -23,10 +23,10 @@ class CalendarController extends Controller
         $calendarStart = $month->copy()->startOfWeek(Carbon::MONDAY);
         $calendarEnd = $month->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
 
-        // Kalender publik hanya menampilkan agenda yang statusnya 'Disetujui',
-        // dengan relasi room dan user.role untuk pewarnaan peminjam (Guru/Organisasi: Hijau, Admin: Kuning).
+        // Agenda yang menunggu keputusan pembatalan tetap menggunakan ruangan.
+        // Relasi room dan user.role dipakai untuk pewarnaan peminjam di kalender.
         $events = Event::with(['room', 'user.role'])
-            ->where('status', 'Disetujui')
+            ->whereIn('status', ['Disetujui', 'Menunggu Pembatalan'])
             ->whereBetween('event_date', [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()])
             ->orderBy('event_date')
             ->orderBy('start_time')

@@ -69,6 +69,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/events', [EventController::class, 'store'])->name('api.events.store');
     Route::get('/events/{event}', [EventController::class, 'show'])->name('api.events.show');
     Route::patch('/events/{event}/decide', [EventController::class, 'decide'])->name('api.events.decide');
+    Route::post('/events/{event}/cancellation-request', [EventController::class, 'requestCancellation'])->name('api.events.cancellation.request');
+    Route::patch('/events/{event}/cancellation-decision', [EventController::class, 'decideCancellation'])->name('api.events.cancellation.decide');
 
     // Pengaduan Sarana Prasarana
     // Mengelola data pengaduan kerusakan fasilitas ruangan beserta unggah/tampil foto bukti kerusakan

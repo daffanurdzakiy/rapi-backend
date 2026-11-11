@@ -30,7 +30,7 @@ class EventResource extends JsonResource
             // Memotong string waktu dari 'HH:MM:SS' menjadi 5 karakter 'HH:MM' (contoh: '08:00')
             'start_time' => substr($this->start_time, 0, 5),
             'end_time' => substr($this->end_time, 0, 5),
-            // Status pengajuan: 'Pending', 'Disetujui', atau 'Ditolak'
+            // Status agenda termasuk status permintaan dan keputusan pembatalan
             'status' => $this->status,
             'execution_status' => $this->execution_status,
             'status_label' => $this->execution_status,
@@ -38,6 +38,9 @@ class EventResource extends JsonResource
             // Catatan alasan pemindahan jadwal (jika pernah dipindah oleh Admin) atau alasan penolakan dari PIC/Admin
             'move_reason' => $this->move_reason,
             'rejection_reason' => $this->rejection_reason,
+            'cancellation_reason' => $this->cancellation_reason,
+            'cancellation_decision_reason' => $this->cancellation_decision_reason,
+            'cancellation_reviewed_by' => $this->cancellation_reviewed_by,
             'created_at' => $this->created_at?->toIso8601String(),
             // Data ruangan yang dipinjam (muncul jika di-load dengan `with('room')`)
             'room' => new RoomResource($this->whenLoaded('room')),
@@ -54,7 +57,10 @@ class EventResource extends JsonResource
                 'id' => $this->approver->id,
                 'name' => $this->approver->name,
             ]),
+            'cancellation_reviewer' => $this->whenLoaded('cancellationReviewer', fn () => [
+                'id' => $this->cancellationReviewer->id,
+                'name' => $this->cancellationReviewer->name,
+            ]),
         ];
     }
 }
-

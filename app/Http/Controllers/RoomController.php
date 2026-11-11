@@ -71,7 +71,7 @@ class RoomController extends Controller
 
             $blockingEvents = Event::with('user')
                 ->where('room_id', $room->id)
-                ->whereIn('status', ['Pending', 'Disetujui'])
+                ->whereIn('status', ['Pending', 'Disetujui', 'Menunggu Pembatalan'])
                 ->where(function ($query) use ($today, $currentTime): void {
                     $query->whereDate('event_date', '>', $today)
                         ->orWhere(function ($todayQuery) use ($today, $currentTime): void {

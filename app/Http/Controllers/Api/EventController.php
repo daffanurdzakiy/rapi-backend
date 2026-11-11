@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Notification;
 use App\Models\Room;
 use App\Models\SessionTime;
+use App\Services\EventCancellationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ class EventController extends ApiController
         $today = now('Asia/Jakarta')->toDateString();
 
         // Urutkan dari hari ini dan tanggal terdekat yang akan datang (identik dengan Desktop Web)
-        $query = Event::with(['room.pic', 'user', 'approver'])
+        $query = Event::with(['room.pic', 'user', 'approver', 'cancellationReviewer'])
             ->orderByRaw('CASE WHEN event_date >= ? THEN 0 ELSE 1 END', [$today])
             ->orderBy('event_date', 'asc')
             ->orderBy('start_time', 'asc');
@@ -78,6 +79,8 @@ class EventController extends ApiController
             'sudah_terlaksana' => $allEvents->where('execution_status', 'Sudah Terlaksana')->count(),
             'menunggu_persetujuan' => $allEvents->filter(fn ($item) => in_array($item->execution_status, ['Menunggu Persetujuan', 'Pending']))->count(),
             'ditolak' => $allEvents->where('status', 'Ditolak')->count(),
+            'menunggu_pembatalan' => $allEvents->where('status', 'Menunggu Pembatalan')->count(),
+            'dibatalkan' => $allEvents->where('status', 'Dibatalkan')->count(),
         ];
 
         // Filter status (mendukung slug real-time & legacy status)
@@ -92,6 +95,8 @@ class EventController extends ApiController
             'sudah_terlaksana' => $allEvents->where('execution_status', 'Sudah Terlaksana')->values(),
             'menunggu_persetujuan' => $allEvents->filter(fn ($item) => in_array($item->execution_status, ['Menunggu Persetujuan', 'Pending']))->values(),
             'ditolak', 'Ditolak' => $allEvents->where('status', 'Ditolak')->values(),
+            'menunggu_pembatalan' => $allEvents->where('status', 'Menunggu Pembatalan')->values(),
+            'dibatalkan' => $allEvents->where('status', 'Dibatalkan')->values(),
             'disetujui', 'Disetujui' => $allEvents->where('status', 'Disetujui')->values(),
             default => $allEvents,
         };
@@ -239,6 +244,7 @@ class EventController extends ApiController
             foreach ($dates as $date) {
                 if ($this->hasConflict($rId, $date->toDateString(), $data['start_time'], $data['end_time'])) {
                     $dateFormatted = $date->translatedFormat('d M Y');
+
                     return $this->sendError("Ruangan {$roomName} sudah digunakan pada tanggal {$dateFormatted} pada rentang waktu tersebut. Silakan pilih ruang atau waktu lain.", [
                         'room_id' => ["Ruangan {$roomName} sudah dipesan pada tanggal {$dateFormatted}."],
                     ], 422);
@@ -350,7 +356,7 @@ class EventController extends ApiController
             return $this->sendError('Anda tidak memiliki akses ke detail agenda ini.', null, 403);
         }
 
-        $event->load(['room.pic', 'user', 'approver']);
+        $event->load(['room.pic', 'user', 'approver', 'cancellationReviewer']);
 
         return $this->sendResponse(
             new EventResource($event),
@@ -365,6 +371,10 @@ class EventController extends ApiController
     // Memproses keputusan persetujuan ('Disetujui') atau penolakan ('Ditolak') oleh PIC ruangan atau Admin
     public function decide(Request $request, Event $event): JsonResponse
     {
+        if ($event->status === 'Menunggu Pembatalan') {
+            return $this->sendError('Gunakan keputusan permintaan pembatalan untuk agenda ini.', null, 422);
+        }
+
         $user = $request->user();
         $role = $user->role?->role_name;
 
@@ -429,6 +439,59 @@ class EventController extends ApiController
         return $this->sendResponse(
             new EventResource($event->fresh(['room.pic', 'user', 'approver'])),
             "Status agenda berhasil diperbarui menjadi {$data['status']}.",
+        );
+    }
+
+    public function requestCancellation(Request $request, Event $event, EventCancellationService $cancellations): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'cancellation_reason' => ['required', 'string', 'max:1000'],
+        ], [
+            'cancellation_reason.required' => 'Alasan pembatalan wajib diisi.',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validasi gagal.', $validator->errors(), 422);
+        }
+
+        $updatedEvent = $cancellations->request(
+            $event,
+            $request->user(),
+            trim($validator->validated()['cancellation_reason']),
+        );
+
+        return $this->sendResponse(
+            new EventResource($updatedEvent),
+            'Permintaan pembatalan berhasil dikirim dan menunggu persetujuan PIC atau Admin.',
+        );
+    }
+
+    public function decideCancellation(Request $request, Event $event, EventCancellationService $cancellations): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'status' => ['required', 'in:Dibatalkan,Disetujui'],
+            'cancellation_decision_reason' => ['required_if:status,Disetujui', 'nullable', 'string', 'max:1000'],
+        ], [
+            'cancellation_decision_reason.required_if' => 'Alasan penolakan pembatalan wajib diisi.',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validasi gagal.', $validator->errors(), 422);
+        }
+
+        $data = $validator->validated();
+        $updatedEvent = $cancellations->decide(
+            $event,
+            $request->user(),
+            $data['status'],
+            $data['cancellation_decision_reason'] ?? null,
+        );
+
+        return $this->sendResponse(
+            new EventResource($updatedEvent),
+            $data['status'] === 'Dibatalkan'
+                ? 'Pembatalan agenda disetujui.'
+                : 'Permintaan pembatalan ditolak dan agenda tetap disetujui.',
         );
     }
 
@@ -584,7 +647,7 @@ class EventController extends ApiController
     {
         return Event::where('room_id', $roomId)
             ->whereDate('event_date', $date)
-            ->where('status', 'Disetujui')
+            ->whereIn('status', ['Disetujui', 'Menunggu Pembatalan'])
             ->where('start_time', '<', $end)
             ->where('end_time', '>', $start)
             ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))

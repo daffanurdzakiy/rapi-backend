@@ -79,7 +79,7 @@
                             <p>{{ $event['execution_status'] }} · {{ $event['status'] }}</p>
                         </div>
                         <div class="room-blocker-actions">
-                            @if($event['execution_status'] !== 'Sedang Berlangsung')
+                            @if($event['execution_status'] !== 'Sedang Berlangsung' && in_array($event['status'], ['Pending', 'Disetujui']))
                                 <a class="btn ghost" href="{{ route('events.edit', $event['id']) }}">Pindahkan</a>
                             @endif
                             <form method="post" action="{{ route('events.destroy', $event['id']) }}" onsubmit="return confirm('Batalkan agenda ini?')">

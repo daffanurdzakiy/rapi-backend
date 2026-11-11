@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/agenda/ajukan', [EventController::class, 'create'])->name('events.create');
     Route::get('/agenda/cek-ketersediaan', [EventController::class, 'checkAvailability'])->name('events.check-availability');
     Route::post('/agenda', [EventController::class, 'store'])->name('events.store');
+    Route::post('/agenda/{event}/ajukan-pembatalan', [EventController::class, 'requestCancellation'])->name('events.cancellation.request');
 
     // Fitur Pengaduan Sarana & Prasarana (Lihat daftar dan tampilkan foto bukti kerusakan & bukti perbaikan)
     Route::get('/pengaduan', [ComplaintController::class, 'index'])->name('complaints.index');
@@ -72,6 +73,7 @@ Route::middleware('auth')->group(function () {
 
     // Aksi Persetujuan / Penolakan Agenda Peminjaman Ruangan oleh PIC atau Admin
     Route::patch('/agenda/{event}/keputusan', [EventController::class, 'decide'])->name('events.decide');
+    Route::patch('/agenda/{event}/keputusan-pembatalan', [EventController::class, 'decideCancellation'])->name('events.cancellation.decide');
 
     // Proses keluar (Logout) dan menghapus sesi login pengguna
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');

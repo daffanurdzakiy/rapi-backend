@@ -28,7 +28,7 @@ class DashboardController extends Controller
         // Mengambil 5 agenda peminjaman ruangan yang berstatus Pending atau Disetujui (diurutkan dari hari ini, dan tidak menampilkan yang sudah selesai setelah ganti hari).
         $today = now('Asia/Jakarta')->toDateString();
         $recentEvents = Event::with(['room', 'user'])
-            ->whereIn('status', ['Pending', 'Disetujui'])
+            ->whereIn('status', ['Pending', 'Disetujui', 'Menunggu Pembatalan'])
             ->when(
                 $role === 'PIC',
                 fn ($query) => $query->whereHas('room', fn ($roomQuery) => $roomQuery->where('pic_id', $user->id)),
@@ -55,7 +55,7 @@ class DashboardController extends Controller
                 ->where('room_name', 'like', "%{$roomName}%")
                 ->with(['events' => fn ($query) => $query
                     ->whereDate('event_date', today())
-                    ->whereIn('status', ['Pending', 'Disetujui'])
+                    ->whereIn('status', ['Pending', 'Disetujui', 'Menunggu Pembatalan'])
                     ->orderBy('start_time')])
                 ->first();
 

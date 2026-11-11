@@ -83,6 +83,12 @@
         color: #b45309 !important;
         font-weight: 700;
     }
+    .badge-cancelled {
+        background: #fef2f2 !important;
+        border-color: #fca5a5 !important;
+        color: #991b1b !important;
+        font-weight: 700;
+    }
 
     .pulse-dot {
         display: inline-block;
@@ -156,6 +162,14 @@
        title="Pengajuan yang ditolak akan tampil selama 24 jam sebelum otomatis diarsipkan">
         Ditolak <span class="filter-count">{{ $counts['ditolak'] ?? 0 }}</span>
     </a>
+    <a href="{{ route('events.index', ['status' => 'menunggu_pembatalan']) }}"
+       class="filter-tab {{ $current === 'menunggu_pembatalan' ? 'active' : '' }}">
+        Menunggu Pembatalan <span class="filter-count">{{ $counts['menunggu_pembatalan'] ?? 0 }}</span>
+    </a>
+    <a href="{{ route('events.index', ['status' => 'dibatalkan']) }}"
+       class="filter-tab {{ $current === 'dibatalkan' ? 'active' : '' }}">
+        Dibatalkan <span class="filter-count">{{ $counts['dibatalkan'] ?? 0 }}</span>
+    </a>
 </div>
 
 <div class="card">
@@ -173,6 +187,15 @@
                         @endif
                         @if($event->status === 'Ditolak' && $event->rejection_reason)
                             <br><span class="error"><b>Alasan ditolak:</b> {{ $event->rejection_reason }}</span>
+                        @endif
+                        @if($event->cancellation_reason)
+                            <br><span class="muted"><b>Alasan pembatalan:</b> {{ $event->cancellation_reason }}</span>
+                        @endif
+                        @if($event->cancellation_decision_reason)
+                            <br><span class="error"><b>Alasan keputusan pembatalan:</b> {{ $event->cancellation_decision_reason }}</span>
+                        @endif
+                        @if($event->cancellationReviewer)
+                            <br><span class="muted">Keputusan pembatalan oleh: {{ $event->cancellationReviewer->name }}</span>
                         @endif
                         @if($event->status === 'Disetujui' && $event->approver)
                             <br><span class="muted">Disetujui oleh: {{ $event->approver->name }} ({{ $event->approver->role?->role_name }})</span>
@@ -206,6 +229,36 @@
                         </div>
                     </form>
                 @endif
+                @if(in_array(auth()->user()->role?->role_name, ['Admin', 'PIC']) && $event->status === 'Menunggu Pembatalan')
+                    <form method="post" action="{{ route('events.cancellation.decide', $event) }}" style="display:inline-flex; margin:0;">
+                        @csrf
+                        @method('PATCH')
+                        <button class="btn danger" name="status" value="Dibatalkan">Setujui Pembatalan</button>
+                    </form>
+                    <div>
+                        <button class="btn ghost" type="button" data-cancellation-rejection-toggle="{{ $event->id }}">Tolak Pembatalan</button>
+                        <form id="cancellation-rejection-panel-{{ $event->id }}" method="post" action="{{ route('events.cancellation.decide', $event) }}" @if(!$errors->has('cancellation_decision_reason')) hidden @endif style="margin-top:8px;">
+                            @csrf
+                            @method('PATCH')
+                            <label for="cancellation_decision_reason-{{ $event->id }}">Alasan penolakan pembatalan</label>
+                            <textarea id="cancellation_decision_reason-{{ $event->id }}" name="cancellation_decision_reason" rows="2" maxlength="1000" @if(!$errors->has('cancellation_decision_reason')) disabled @else required @endif>{{ old('cancellation_decision_reason') }}</textarea>
+                            @error('cancellation_decision_reason')<p class="error">{{ $message }}</p>@enderror
+                            <button class="btn" type="submit" name="status" value="Disetujui" data-cancellation-rejection-submit="{{ $event->id }}" style="margin-top:8px;" @if(!$errors->has('cancellation_decision_reason')) disabled @endif>Tolak Permintaan</button>
+                        </form>
+                    </div>
+                @endif
+                @if(in_array(auth()->user()->role?->role_name, ['Guru', 'Organisasi']) && $event->user_id === auth()->id() && $event->status === 'Disetujui' && $event->execution_status === 'Belum Terlaksana')
+                    <details>
+                        <summary class="btn ghost" style="cursor:pointer;">Ajukan Pembatalan</summary>
+                        <form method="post" action="{{ route('events.cancellation.request', $event) }}" style="margin-top:8px;">
+                            @csrf
+                            <label for="cancellation_reason-{{ $event->id }}">Alasan pembatalan</label>
+                            <textarea id="cancellation_reason-{{ $event->id }}" name="cancellation_reason" rows="2" maxlength="1000" required>{{ old('cancellation_reason') }}</textarea>
+                            @error('cancellation_reason')<p class="error">{{ $message }}</p>@enderror
+                            <button class="btn danger" type="submit" style="margin-top:8px;" onclick="return confirm('Kirim permintaan pembatalan untuk agenda ini?')">Kirim Permintaan</button>
+                        </form>
+                    </details>
+                @endif
                 @if(auth()->user()->role?->role_name === 'Admin' && in_array($event->status, ['Pending', 'Disetujui']))
                     <a class="btn ghost" href="{{ route('events.edit', $event) }}">Edit</a>
                 @endif
@@ -215,7 +268,7 @@
         <div style="text-align:center; padding:32px 16px;">
             <p class="muted" style="margin:0; font-size:14px;">
                 @if(($currentFilter ?? 'semua') !== 'semua')
-                    Tidak ada agenda dengan status <b>{{ $currentFilter === 'sedang_berlangsung' ? 'Sedang Berlangsung' : ($currentFilter === 'belum_terlaksana' ? 'Belum Terlaksana' : ($currentFilter === 'sudah_terlaksana' ? 'Sudah Terlaksana' : ($currentFilter === 'menunggu_persetujuan' || $currentFilter === 'pending' ? 'Menunggu Persetujuan' : 'Ditolak'))) }}</b>.
+                    Tidak ada agenda dengan status <b>{{ ['sedang_berlangsung' => 'Sedang Berlangsung', 'belum_terlaksana' => 'Belum Terlaksana', 'sudah_terlaksana' => 'Sudah Terlaksana', 'menunggu_persetujuan' => 'Menunggu Persetujuan', 'pending' => 'Menunggu Persetujuan', 'menunggu_pembatalan' => 'Menunggu Pembatalan', 'dibatalkan' => 'Dibatalkan', 'ditolak' => 'Ditolak'][$currentFilter] ?? $currentFilter }}</b>.
                 @else
                     Belum ada agenda peminjaman ruangan.
                 @endif
@@ -236,6 +289,22 @@
             var textarea = document.getElementById('rejection_reason-' + eventId);
             var status = panel.querySelector('input[name="status"]');
             var submit = panel.querySelector('[data-rejection-submit]');
+            panel.hidden = false;
+            textarea.disabled = false;
+            status.disabled = false;
+            submit.disabled = false;
+            textarea.required = true;
+            textarea.focus();
+        });
+    });
+
+    document.querySelectorAll('[data-cancellation-rejection-toggle]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var eventId = button.getAttribute('data-cancellation-rejection-toggle');
+            var panel = document.getElementById('cancellation-rejection-panel-' + eventId);
+            var textarea = document.getElementById('cancellation_decision_reason-' + eventId);
+            var status = panel.querySelector('input[name="status"]');
+            var submit = panel.querySelector('[data-cancellation-rejection-submit]');
             panel.hidden = false;
             textarea.disabled = false;
             status.disabled = false;

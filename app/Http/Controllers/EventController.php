@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Notification;
 use App\Models\Room;
 use App\Models\SessionTime;
+use App\Services\EventCancellationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -29,7 +30,7 @@ class EventController extends Controller
         $today = now('Asia/Jakarta')->toDateString();
 
         // Urutkan dari hari ini yang paling teratas dan semakin ke bawah menuju tanggal terdekat yang akan datang
-        $query = Event::with(['room', 'user', 'approver'])
+        $query = Event::with(['room', 'user', 'approver', 'cancellationReviewer'])
             ->orderByRaw('CASE WHEN event_date >= ? THEN 0 ELSE 1 END', [$today])
             ->orderBy('event_date', 'asc')
             ->orderBy('start_time', 'asc');
@@ -60,6 +61,8 @@ class EventController extends Controller
             'menunggu_persetujuan' => $allEvents->filter(fn ($item) => in_array($item->execution_status, ['Menunggu Persetujuan', 'Pending']))->count(),
             'pending' => $allEvents->filter(fn ($item) => in_array($item->execution_status, ['Menunggu Persetujuan', 'Pending']))->count(),
             'ditolak' => $allEvents->where('status', 'Ditolak')->count(),
+            'menunggu_pembatalan' => $allEvents->where('status', 'Menunggu Pembatalan')->count(),
+            'dibatalkan' => $allEvents->where('status', 'Dibatalkan')->count(),
         ];
 
         $filter = $request->query('status', 'semua');
@@ -70,6 +73,8 @@ class EventController extends Controller
             'menunggu_persetujuan' => 'Menunggu Persetujuan',
             'pending' => 'Menunggu Persetujuan',
             'ditolak' => 'Ditolak',
+            'menunggu_pembatalan' => 'Menunggu Pembatalan',
+            'dibatalkan' => 'Dibatalkan',
         ];
 
         if (isset($statusFilterMap[$filter])) {
@@ -81,6 +86,10 @@ class EventController extends Controller
                 if ($target === 'Ditolak') {
                     return $item->status === 'Ditolak';
                 }
+                if (in_array($target, ['Menunggu Pembatalan', 'Dibatalkan'], true)) {
+                    return $item->status === $target;
+                }
+
                 return $item->execution_status === $target;
             })->values();
         } else {
@@ -271,6 +280,43 @@ class EventController extends Controller
         return redirect()->route('events.index')->with('success', $message);
     }
 
+    public function requestCancellation(Request $request, Event $event, EventCancellationService $cancellations): RedirectResponse
+    {
+        $data = $request->validate([
+            'cancellation_reason' => ['required', 'string', 'max:1000'],
+        ], [
+            'cancellation_reason.required' => 'Alasan pembatalan wajib diisi.',
+        ]);
+
+        $cancellations->request($event, $request->user(), trim($data['cancellation_reason']));
+
+        return back()->with('success', 'Permintaan pembatalan berhasil dikirim dan menunggu persetujuan PIC atau Admin.');
+    }
+
+    public function decideCancellation(Request $request, Event $event, EventCancellationService $cancellations): RedirectResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'in:Dibatalkan,Disetujui'],
+            'cancellation_decision_reason' => ['required_if:status,Disetujui', 'nullable', 'string', 'max:1000'],
+        ], [
+            'cancellation_decision_reason.required_if' => 'Alasan penolakan pembatalan wajib diisi.',
+        ]);
+
+        $cancellations->decide(
+            $event,
+            $request->user(),
+            $data['status'],
+            $data['cancellation_decision_reason'] ?? null,
+        );
+
+        return back()->with(
+            'success',
+            $data['status'] === 'Dibatalkan'
+                ? 'Pembatalan agenda disetujui.'
+                : 'Permintaan pembatalan ditolak dan agenda tetap disetujui.',
+        );
+    }
+
     // Menampilkan halaman Edit Agenda (khusus Admin untuk memindahkan ruangan atau mengubah jam).
     public function edit(Request $request, Event $event): View
     {
@@ -281,7 +327,7 @@ class EventController extends Controller
         $dateString = Carbon::parse($event->event_date)->toDateString();
         $approvedEventsOnDate = Event::with('room')
             ->whereDate('event_date', $dateString)
-            ->where('status', 'Disetujui')
+            ->whereIn('status', ['Disetujui', 'Menunggu Pembatalan'])
             ->whereKeyNot($event->id)
             ->get(['id', 'room_id', 'title', 'start_time', 'end_time']);
 
@@ -381,6 +427,7 @@ class EventController extends Controller
     // Memproses keputusan Setujui ('Disetujui') atau Tolak ('Ditolak') oleh Admin maupun PIC ruangan terkait.
     public function decide(Request $request, Event $event): RedirectResponse
     {
+        abort_unless($event->status !== 'Menunggu Pembatalan', 422, 'Gunakan keputusan permintaan pembatalan untuk agenda ini.');
         $user = $request->user();
         $role = $user->role?->role_name;
         abort_unless(
@@ -429,7 +476,7 @@ class EventController extends Controller
     public function destroy(Request $request, Event $event): RedirectResponse
     {
         abort_unless($request->user()->role?->role_name === 'Admin', 403);
-        abort_unless(in_array($event->status, ['Pending', 'Disetujui']), 422, 'Hanya agenda aktif yang dapat dibatalkan.');
+        abort_unless(in_array($event->status, ['Pending', 'Disetujui', 'Menunggu Pembatalan']), 422, 'Hanya agenda aktif yang dapat dibatalkan.');
 
         DB::transaction(function () use ($event): void {
             Notification::create([
@@ -529,7 +576,7 @@ class EventController extends Controller
                 $dateStr = $date->toDateString();
                 $conflict = Event::where('room_id', $rId)
                     ->whereDate('event_date', $dateStr)
-                    ->where('status', 'Disetujui')
+                    ->whereIn('status', ['Disetujui', 'Menunggu Pembatalan'])
                     ->where('start_time', '<', $endTime)
                     ->where('end_time', '>', $startTime)
                     ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
@@ -538,6 +585,7 @@ class EventController extends Controller
                 if ($conflict) {
                     $conflictTime = substr($conflict->start_time, 0, 5).'–'.substr($conflict->end_time, 0, 5);
                     $dateFormatted = $date->translatedFormat('d M Y');
+
                     return response()->json([
                         'success' => true,
                         'available' => false,
@@ -666,7 +714,7 @@ class EventController extends Controller
         $conflict = Event::with('room')
             ->where('room_id', $roomId)
             ->whereDate('event_date', $date)
-            ->where('status', 'Disetujui')
+            ->whereIn('status', ['Disetujui', 'Menunggu Pembatalan'])
             ->where('start_time', '<', $end)
             ->where('end_time', '>', $start)
             ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))

@@ -14,13 +14,13 @@ use Illuminate\Http\Request;
 // =========================================================================
 // Menyediakan data jadwal peminjaman ruangan yang SUDAH DISETUJUI ('Disetujui')
 // dan daftar Hari Libur Nasional resmi SKB 3 Menteri secara publik tanpa wajib login.
-// 
+//
 // PERTANYAAN PENGUJI YANG SERING DITANYAKAN:
 // Q: "Mengapa endpoint ini bisa diakses tanpa token login (Bearer Token)?"
 // A: "Karena kalender sekolah berfungsi sebagai papan pengumuman digital publik.
 //     Siswa, guru, atau tamu sekolah dapat melihat ketersediaan ruangan sebelum
 //     mengajukan permohonan peminjaman ruangan."
-// 
+//
 // Q: "Bagaimana cara mencegah N+1 Query Problem saat memuat agenda kalender?"
 // A: "Kami menerapkan Eager Loading menggunakan method `with(['room.pic', 'user'])`.
 //     Dengan ini, data relasi Ruangan, PIC, dan Pemohon diambil sekaligus dalam
@@ -37,9 +37,9 @@ class CalendarController extends ApiController
      */
     public function index(Request $request, NationalHolidayService $holidayService): JsonResponse
     {
-        // 1. Inisialisasi query agenda yang berstatus 'Disetujui' dengan Eager Loading
+        // Agenda yang menunggu keputusan pembatalan tetap menggunakan ruangan.
         $query = Event::with(['room.pic', 'user'])
-            ->where('status', 'Disetujui');
+            ->whereIn('status', ['Disetujui', 'Menunggu Pembatalan']);
 
         // 2. Evaluasi filter tanggal: Apakah client meminta rentang khusus atau bulan kalender
         if ($request->filled('start_date') && $request->filled('end_date')) {
@@ -98,8 +98,8 @@ class CalendarController extends ApiController
      */
     public function show(Event $event): JsonResponse
     {
-        // Pengamanan: Agenda yang masih 'Pending' atau 'Ditolak' tidak boleh bocor ke publik
-        if ($event->status !== 'Disetujui') {
+        // Agenda yang menunggu keputusan pembatalan tetap menggunakan ruangan.
+        if (! in_array($event->status, ['Disetujui', 'Menunggu Pembatalan'], true)) {
             return $this->sendError('Agenda belum disetujui atau tidak dapat diakses secara publik.', null, 403);
         }
 
@@ -111,4 +111,3 @@ class CalendarController extends ApiController
         );
     }
 }
-

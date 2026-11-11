@@ -36,7 +36,7 @@ class DashboardController extends ApiController
                 ->where('room_name', 'like', "%{$keyword}%")
                 ->with(['events' => fn ($query) => $query
                     ->whereDate('event_date', today('Asia/Jakarta'))
-                    ->whereIn('status', ['Pending', 'Disetujui'])
+                    ->whereIn('status', ['Pending', 'Disetujui', 'Menunggu Pembatalan'])
                     ->orderBy('start_time')])
                 ->first();
 
@@ -70,7 +70,7 @@ class DashboardController extends ApiController
             // Hitung jumlah agenda hari ini di ruangan milik PIC
             $todayEventsCount = Event::whereIn('room_id', $assignedRoomIds)
                 ->whereDate('event_date', today())
-                ->whereIn('status', ['Pending', 'Disetujui'])
+                ->whereIn('status', ['Pending', 'Disetujui', 'Menunggu Pembatalan'])
                 ->count();
 
             // Hitung jumlah agenda yang masih menunggu persetujuan ('Pending') di ruangan milik PIC
@@ -88,7 +88,7 @@ class DashboardController extends ApiController
             // Ambil 5 agenda terdekat pada ruangan milik PIC
             $recentEvents = Event::with(['room', 'user'])
                 ->whereIn('room_id', $assignedRoomIds)
-                ->whereIn('status', ['Pending', 'Disetujui'])
+                ->whereIn('status', ['Pending', 'Disetujui', 'Menunggu Pembatalan'])
                 ->orderBy('event_date')
                 ->orderBy('start_time')
                 ->limit(5)
@@ -143,7 +143,7 @@ class DashboardController extends ApiController
             // Hitung statistik agenda milik sendiri (total, pending, dan disetujui)
             $myEventsCount = (clone $myEventsQuery)->count();
             $myPendingEventsCount = (clone $myEventsQuery)->where('status', 'Pending')->count();
-            $myApprovedEventsCount = (clone $myEventsQuery)->where('status', 'Disetujui')->count();
+            $myApprovedEventsCount = (clone $myEventsQuery)->whereIn('status', ['Disetujui', 'Menunggu Pembatalan'])->count();
 
             // Hitung statistik pengaduan milik sendiri
             $myComplaintsCount = (clone $myComplaintsQuery)->count();
@@ -151,7 +151,7 @@ class DashboardController extends ApiController
 
             // Hitung total seluruh agenda yang disetujui hari ini di sekolah
             $todayEventsCount = Event::whereDate('event_date', today())
-                ->where('status', 'Disetujui')
+                ->whereIn('status', ['Disetujui', 'Menunggu Pembatalan'])
                 ->count();
 
             // Ambil 5 agenda terbaru yang diajukan oleh user ini
@@ -204,7 +204,7 @@ class DashboardController extends ApiController
             'featured_room_schedules' => $featuredRoomSchedules,
             'stats' => [
                 'total_rooms' => Room::count(),
-                'today_events' => Event::whereDate('event_date', today())->whereIn('status', ['Pending', 'Disetujui'])->count(),
+                'today_events' => Event::whereDate('event_date', today())->whereIn('status', ['Pending', 'Disetujui', 'Menunggu Pembatalan'])->count(),
                 'pending_events' => Event::where('status', 'Pending')->count(),
                 'pending_complaints' => Complaint::where('status_repair', 'Belum Diperbaiki')->count(),
                 'unread_notifications_count' => $user->notifications()->where('is_read', false)->count(),
@@ -212,4 +212,3 @@ class DashboardController extends ApiController
         ], 'Dashboard Admin berhasil dimuat.');
     }
 }
-

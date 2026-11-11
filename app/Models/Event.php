@@ -17,7 +17,7 @@ class Event extends Model
 {
     // Daftar atribut/kolom yang boleh diisi secara massal (Mass Assignment)
     // Tambahkan nama kolom baru di sini jika tabel `events` memiliki tambahan field.
-    protected $fillable = ['user_id', 'room_id', 'title', 'event_date', 'start_time', 'end_time', 'status', 'approved_by', 'move_reason', 'rejection_reason'];
+    protected $fillable = ['user_id', 'room_id', 'title', 'event_date', 'start_time', 'end_time', 'status', 'approved_by', 'move_reason', 'rejection_reason', 'cancellation_reason', 'cancellation_decision_reason', 'cancellation_reviewed_by'];
 
     protected $appends = ['execution_status'];
 
@@ -40,6 +40,11 @@ class Event extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function cancellationReviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancellation_reviewed_by');
     }
 
     /** Cast calendar date into a date object for safe formatting. */
@@ -65,6 +70,7 @@ class Event extends Model
             if ($this->status === 'Pending') {
                 return 'Menunggu Persetujuan';
             }
+
             return $this->status ?? 'Menunggu Persetujuan';
         }
 
@@ -109,6 +115,8 @@ class Event extends Model
             'Belum Terlaksana' => 'badge-upcoming',
             'Sudah Terlaksana' => 'badge-completed',
             'Ditolak' => 'badge-rejected',
+            'Dibatalkan' => 'badge-cancelled',
+            'Menunggu Pembatalan' => 'badge-pending',
             'Menunggu Persetujuan', 'Pending' => 'badge-pending',
             default => '',
         };
@@ -153,7 +161,7 @@ class Event extends Model
 
         try {
             $rejectedAt = $this->updated_at ?? $this->created_at;
-            if (!$rejectedAt) {
+            if (! $rejectedAt) {
                 return false;
             }
 
