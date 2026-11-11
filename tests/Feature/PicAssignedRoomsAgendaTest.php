@@ -6,6 +6,7 @@ use App\Models\Complaint;
 use App\Models\Event;
 use App\Models\Room;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -57,6 +58,7 @@ class PicAssignedRoomsAgendaTest extends TestCase
 
     public function test_pic_schedule_page_does_not_show_facility_complaint_section(): void
     {
+        $this->travelTo(Carbon::create(2026, 11, 9, 10, 0, 0, 'Asia/Jakarta'));
         $pic = $this->userWithRole('PIC');
         $room = $this->roomFor($pic, 'Ruang Laboratorium');
 
@@ -193,8 +195,7 @@ class PicAssignedRoomsAgendaTest extends TestCase
                 ->assertSee('KOSONG')
                 ->assertSee('Belum ada agenda untuk hari ini.')
                 ->assertDontSee('Agenda Ditolak Dak')
-                ->assertViewHas('featuredRoomSchedules', fn ($schedules) =>
-                    $schedules['Wijaya']['events']->pluck('title')->contains('Rapat Wijaya Hari Ini')
+                ->assertViewHas('featuredRoomSchedules', fn ($schedules) => $schedules['Wijaya']['events']->pluck('title')->contains('Rapat Wijaya Hari Ini')
                     && $schedules['Dak']['events']->isEmpty()
                 );
         }
