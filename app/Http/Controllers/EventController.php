@@ -276,6 +276,7 @@ class EventController extends Controller
     {
         abort_unless($request->user()->role?->role_name === 'Admin', 403);
         abort_unless(in_array($event->status, ['Pending', 'Disetujui']), 422);
+        abort_unless($event->execution_status !== 'Sedang Berlangsung', 422, 'Agenda yang sedang berlangsung tidak dapat dipindahkan.');
 
         $dateString = Carbon::parse($event->event_date)->toDateString();
         $approvedEventsOnDate = Event::with('room')
@@ -297,6 +298,7 @@ class EventController extends Controller
     {
         abort_unless($request->user()->role?->role_name === 'Admin', 403);
         abort_unless(in_array($event->status, ['Pending', 'Disetujui']), 422);
+        abort_unless($event->execution_status !== 'Sedang Berlangsung', 422, 'Agenda yang sedang berlangsung tidak dapat dipindahkan.');
 
         $this->useFreeTimeInputs($request);
         $sessionTimes = $this->regularSessionTimes();
@@ -423,14 +425,22 @@ class EventController extends Controller
         return back()->with('success', 'Status agenda berhasil diperbarui.');
     }
 
-    // Membatalkan/menghapus agenda yang sudah disetujui (khusus Admin).
+    // Membatalkan agenda aktif dan memberi tahu pemohon (khusus Admin).
     public function destroy(Request $request, Event $event): RedirectResponse
     {
         abort_unless($request->user()->role?->role_name === 'Admin', 403);
-        abort_unless($event->status === 'Disetujui', 422, 'Hanya agenda yang disetujui yang dapat dibatalkan.');
-        $event->delete();
+        abort_unless(in_array($event->status, ['Pending', 'Disetujui']), 422, 'Hanya agenda aktif yang dapat dibatalkan.');
 
-        return back()->with('success', 'Agenda yang disetujui berhasil dihapus.');
+        DB::transaction(function () use ($event): void {
+            Notification::create([
+                'event_id' => null,
+                'user_id' => $event->user_id,
+                'message' => "Agenda {$event->title} pada {$event->event_date->format('d M Y')} dibatalkan oleh admin.",
+            ]);
+            $event->delete();
+        });
+
+        return back()->with('success', 'Agenda berhasil dibatalkan dan pemohon telah diberi notifikasi.');
     }
 
     /** Check if one or multiple rooms are available for the given date(s) and time range (Web AJAX). */

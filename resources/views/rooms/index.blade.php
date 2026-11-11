@@ -30,10 +30,21 @@
         .room-actions form { margin:0; }
         .rooms-empty { grid-column:1 / -1; margin:0; padding:24px; color:var(--muted); text-align:center; }
         .room-dialog .room-details { padding:0 23px 23px; border-top:0; }
+        .room-blockers-dialog { width:min(680px, calc(100% - 32px)); max-height:min(84vh, 720px); overflow:auto; margin:auto; padding:22px; border:1px solid #e8e1d3; border-radius:18px; background:#fffdf8; color:#26364a; box-shadow:0 24px 80px rgba(38, 54, 74, .18); }
+        .room-blockers-dialog::backdrop { background:rgba(38, 54, 74, .42); backdrop-filter:blur(5px); }
+        .room-blockers-dialog h2 { margin:0 0 8px; font-size:20px; }
+        .room-blockers-dialog > p { margin:0 0 16px; color:#6d7788; font-size:13px; line-height:1.5; }
+        .room-blocker-list { display:grid; gap:12px; margin:0; padding:0; list-style:none; }
+        .room-blocker-item { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px; border:1px solid #e8e1d3; border-radius:12px; background:#fff; }
+        .room-blocker-item p { margin:4px 0 0; color:#6d7788; font-size:12px; line-height:1.5; }
+        .room-blocker-actions { display:flex; flex:0 0 auto; flex-wrap:wrap; gap:8px; }
+        .room-blocker-actions form { margin:0; }
+        .room-blockers-close { display:flex; justify-content:flex-end; margin-top:18px; }
         @media (max-width:760px) {
             .rooms-toolbar { align-items:stretch; flex-direction:column; }
             .rooms-search { flex:1 1 auto; }
             .rooms-search .btn { flex:0 0 auto; }
+            .room-blocker-item { align-items:flex-start; flex-direction:column; }
         }
     </style>
 
@@ -54,6 +65,37 @@
         </form>
         <a class="btn" href="{{ route('rooms.create') }}">+ Tambah Ruangan</a>
     </div>
+
+    @if(session('room_blocking_events'))
+        <dialog class="room-blockers-dialog" id="room-blockers-dialog" aria-labelledby="room-blockers-title">
+            <h2 id="room-blockers-title">Agenda masih menggunakan ruangan</h2>
+            <p>Pindahkan agenda mendatang atau batalkan agenda yang tidak jadi dilaksanakan. Agenda yang sedang berlangsung hanya dapat dibatalkan. Setelah semua agenda aktif ditangani, coba hapus ruangan kembali.</p>
+            <ul class="room-blocker-list">
+                @foreach(session('room_blocking_events') as $event)
+                    <li class="room-blocker-item">
+                        <div>
+                            <strong>{{ $event['title'] }}</strong>
+                            <p>{{ \Illuminate\Support\Carbon::parse($event['event_date'])->translatedFormat('d M Y') }} · {{ $event['start_time'] }}–{{ $event['end_time'] }} · {{ $event['user'] }}</p>
+                            <p>{{ $event['execution_status'] }} · {{ $event['status'] }}</p>
+                        </div>
+                        <div class="room-blocker-actions">
+                            @if($event['execution_status'] !== 'Sedang Berlangsung')
+                                <a class="btn ghost" href="{{ route('events.edit', $event['id']) }}">Pindahkan</a>
+                            @endif
+                            <form method="post" action="{{ route('events.destroy', $event['id']) }}" onsubmit="return confirm('Batalkan agenda ini?')">
+                                @csrf
+                                @method('DELETE')
+                                <button class="btn danger" type="submit">Batalkan</button>
+                            </form>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+            <div class="room-blockers-close">
+                <button class="btn ghost" type="button" data-close-blockers-dialog>Tutup</button>
+            </div>
+        </dialog>
+    @endif
 
     <div class="rooms-grid">
         @forelse($rooms as $room)
@@ -130,5 +172,15 @@
                 }
             });
         });
+
+        var blockersDialog = document.getElementById('room-blockers-dialog');
+        if (blockersDialog) {
+            blockersDialog.showModal();
+            blockersDialog.addEventListener('click', function (event) {
+                if (event.target === blockersDialog || event.target.closest('[data-close-blockers-dialog]')) {
+                    blockersDialog.close();
+                }
+            });
+        }
     </script>
 @endsection

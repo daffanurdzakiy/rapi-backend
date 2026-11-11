@@ -8,6 +8,7 @@ use App\Models\Room;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 // Controller khusus Admin untuk mengelola Data Master Ruangan beserta penugasan PIC-nya.
@@ -59,16 +60,54 @@ class RoomController extends Controller
     }
 
     /** Delete a room only when no related booking or complaint is needed anymore. */
-    // Menghapus ruangan (ditolak jika ruangan sudah pernah dipakai untuk agenda atau laporan pengaduan).
+    // Menahan penghapusan jika masih ada agenda aktif dan menampilkan agenda yang perlu ditangani admin.
     public function destroy(Room $room): RedirectResponse
     {
-        if (Event::where('room_id', $room->id)->exists() || Complaint::where('room_id', $room->id)->exists()) {
-            return back()->with('error', 'Ruangan tidak dapat dihapus karena sudah memiliki agenda atau pengaduan.');
-        }
+        return DB::transaction(function () use ($room): RedirectResponse {
+            $room = Room::whereKey($room->id)->lockForUpdate()->firstOrFail();
+            $now = now('Asia/Jakarta');
+            $today = $now->toDateString();
+            $currentTime = $now->format('H:i:s');
 
-        $room->delete();
+            $blockingEvents = Event::with('user')
+                ->where('room_id', $room->id)
+                ->whereIn('status', ['Pending', 'Disetujui'])
+                ->where(function ($query) use ($today, $currentTime): void {
+                    $query->whereDate('event_date', '>', $today)
+                        ->orWhere(function ($todayQuery) use ($today, $currentTime): void {
+                            $todayQuery->whereDate('event_date', $today)
+                                ->where('end_time', '>=', $currentTime);
+                        });
+                })
+                ->orderBy('event_date')
+                ->orderBy('start_time')
+                ->get();
 
-        return back()->with('success', 'Ruangan berhasil dihapus.');
+            if ($blockingEvents->isNotEmpty()) {
+                $details = $blockingEvents->map(fn (Event $event): array => [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'user' => $event->user->name,
+                    'event_date' => $event->event_date->format('Y-m-d'),
+                    'start_time' => substr($event->start_time, 0, 5),
+                    'end_time' => substr($event->end_time, 0, 5),
+                    'status' => $event->status,
+                    'execution_status' => $event->execution_status,
+                ])->all();
+
+                return back()
+                    ->with('error', 'Ruangan tidak dapat dihapus. Pindahkan atau batalkan agenda aktif berikut terlebih dahulu.')
+                    ->with('room_blocking_events', $details);
+            }
+
+            if (Event::where('room_id', $room->id)->exists() || Complaint::where('room_id', $room->id)->exists()) {
+                return back()->with('error', 'Ruangan tidak dapat dihapus karena masih memiliki riwayat agenda atau pengaduan.');
+            }
+
+            $room->delete();
+
+            return back()->with('success', 'Ruangan berhasil dihapus.');
+        });
     }
 
     /** Validate the master-room fields and its PIC assignment. */
