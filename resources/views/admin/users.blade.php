@@ -44,13 +44,19 @@
 </div>
 
 @if ($errors->any())
-    <div class="card" role="alert">
-        <p><strong>Perubahan belum disimpan. Periksa kembali data berikut:</strong></p>
-        <ul>
-            @foreach ($errors->all() as $error)
-                <li class="error">{{ $error }}</li>
-            @endforeach
-        </ul>
+    <div class="flash-alert flash-alert--error no-print" role="alert" data-flash-alert>
+        <span class="flash-alert-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        </span>
+        <div class="flash-alert-body">
+            <strong class="flash-alert-title">Perubahan belum disimpan. Periksa kembali data berikut:</strong>
+            <ul class="flash-alert-list">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+        <button type="button" class="flash-alert-close" aria-label="Tutup pemberitahuan" title="Tutup" data-flash-close>&times;</button>
     </div>
 @endif
 

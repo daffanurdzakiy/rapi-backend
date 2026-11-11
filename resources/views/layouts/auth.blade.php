@@ -134,6 +134,7 @@
             .reset-card { padding: 30px 24px; }
         }
         @media (max-width: 640px) { .panel { padding: 20px; } .grid { grid-template-columns: 1fr; } .topbar { align-items: flex-start; flex-direction: column; } }
+@include('partials.flash-alert-styles')
     </style>
 </head>
 <body>
@@ -164,4 +165,5 @@
         });
     });
 </script>
+@include('partials.flash-alert-script')
 </html>

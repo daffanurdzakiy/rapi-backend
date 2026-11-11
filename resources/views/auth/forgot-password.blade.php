@@ -9,9 +9,7 @@
                     {{ session('status', 'Masukkan kode OTP yang dikirim ke email Anda. Kode berlaku selama 10 menit.') }}
                 </p>
 
-                @if(session('mail_error'))
-                    <p class="error" role="alert">{{ session('mail_error') }}</p>
-                @endif
+                @include('partials.flash-alerts', ['onlyKeys' => ['mail_error'], 'compact' => true])
 
                 <form method="POST" action="{{ route('password.otp') }}">
                     @csrf
@@ -36,9 +34,7 @@
                 <h1>Atur ulang kata sandi</h1>
                 <p class="reset-description">Masukan email buat reset password</p>
 
-                @if(session('mail_error'))
-                    <p class="error" role="alert">{{ session('mail_error') }}</p>
-                @endif
+                @include('partials.flash-alerts', ['onlyKeys' => ['mail_error'], 'compact' => true])
 
                 <form method="POST" action="{{ route('password.email') }}">
                     @csrf

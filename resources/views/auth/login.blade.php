@@ -31,7 +31,7 @@
                         <a href="{{ route('password.request') }}">Lupa Password?</a>
                     </div>
 
-                    @if(session('status'))<p class="success">{{ session('status') }}</p>@endif
+                    @include('partials.flash-alerts', ['onlyKeys' => ['status'], 'compact' => true])
                     @error('email')<p class="error">{{ $message }}</p>@enderror
                     @error('password')<p class="error">{{ $message }}</p>@enderror
 

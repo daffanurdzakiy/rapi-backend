@@ -534,6 +534,7 @@
             .dashboard-date { padding: 0 0 8px; }
             .quick-action { width: 100%; }
         }
+@include('partials.flash-alert-styles')
     </style>
 </head>
 <body>
@@ -579,7 +580,7 @@
 
         <main class="main">
             <section class="content">
-                @if(session('success'))<p class="success">{{ session('success') }}</p>@endif
+                @include('partials.flash-alerts')
                 @yield('content')
             </section>
         </main>
@@ -640,5 +641,6 @@
             });
         });
     </script>
+@include('partials.flash-alert-script')
 </body>
 </html>
