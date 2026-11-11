@@ -143,14 +143,14 @@
 
     <div class="card">
         @forelse($complaints as $complaint)
-            <div id="complaint-{{ $complaint->id }}" class="list complaint-item {{ (int) request('highlight') === (int) $complaint->id ? 'highlight-target' : '' }}">
+            <div class="list complaint-item">
                 <div class="heading complaint-heading">
                     <div style="flex:1 1 auto; min-width:0;">
                         <h3>{{ $complaint->room->room_name }}</h3>
                         <p>
                             <span style="font-size:14px; color:#26364a; font-weight:500;">{{ $complaint->description }}</span><br>
                             <span class="muted" style="display:inline-block; margin-top:4px; font-size:12px;">
-                                Pelapor: <b>{{ $complaint->reporter->name }}</b> · PIC Ruangan: <b>{{ $complaint->room->pic?->name ?? 'Belum ditugaskan' }}</b> · Dilaporkan: {{ $complaint->created_at->format('d M Y, H:i') }}
+                                Pelapor: <b>{{ $complaint->reporter->name }}</b> · PIC Ruangan: <b>{{ $complaint->room->pic->name }}</b> · Dilaporkan: {{ $complaint->created_at->format('d M Y, H:i') }}
                             </span>
                         </p>
 

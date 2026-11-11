@@ -24,15 +24,13 @@ class NotificationController extends ApiController
         $user = $request->user();
 
         // Muat notifikasi beserta relasi agenda+ruangan dan pengaduan+ruangan dari yang paling baru
-        $visibleQuery = Notification::visibleTo($user);
-
-        $notifications = (clone $visibleQuery)
+        $notifications = $user->notifications()
             ->with(['event.room', 'complaint.room'])
             ->latest()
             ->paginate($request->input('per_page', 20));
 
         // Hitung total notifikasi yang belum dibaca (`is_read = false`) untuk ditampilkan pada badge lonceng aplikasi
-        $unreadCount = (clone $visibleQuery)->where('is_read', false)->count();
+        $unreadCount = $user->notifications()->where('is_read', false)->count();
 
         return $this->sendResponse([
             'unread_count' => $unreadCount,
@@ -53,12 +51,8 @@ class NotificationController extends ApiController
     // Menandai satu notifikasi spesifik sebagai sudah dibaca (`is_read = true`)
     public function markAsRead(Request $request, Notification $notification): JsonResponse
     {
-        // Keamanan: Pastikan user hanya bisa menandai notifikasi yang dapat ia akses
-        $isVisible = Notification::visibleTo($request->user())
-            ->whereKey($notification->id)
-            ->exists();
-
-        if (! $isVisible) {
+        // Keamanan: Pastikan user hanya bisa menandai notifikasi miliknya sendiri
+        if ($notification->user_id !== $request->user()->id) {
             return $this->sendError('Notifikasi tidak ditemukan.', null, 404);
         }
 
@@ -77,9 +71,7 @@ class NotificationController extends ApiController
     // Menandai seluruh notifikasi milik user yang belum dibaca menjadi sudah dibaca sekaligus
     public function markAllAsRead(Request $request): JsonResponse
     {
-        Notification::visibleTo($request->user())
-            ->where('is_read', false)
-            ->update(['is_read' => true]);
+        $request->user()->notifications()->where('is_read', false)->update(['is_read' => true]);
 
         return $this->sendResponse(null, 'Semua notifikasi telah ditandai sudah dibaca.');
     }

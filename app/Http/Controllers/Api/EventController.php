@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\EventResource;
 use App\Models\Event;
+use App\Models\Notification;
 use App\Models\Room;
 use App\Models\SessionTime;
-use App\Support\NotificationDispatcher;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -282,7 +282,8 @@ class EventController extends ApiController
             }
         });
 
-        // Kirim notifikasi ke PIC masing-masing ruangan dan Admin bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
+        // If submitted by Guru/Organisasi, optionally notify each room's PIC
+        // Kirim notifikasi ke PIC masing-masing ruangan bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
         $firstDate = $dates[0];
         $lastDate = $dates[count($dates) - 1];
         if ($status === 'Pending') {
@@ -290,14 +291,17 @@ class EventController extends ApiController
                 ? "{$firstDate->translatedFormat('d M')} s/d {$lastDate->translatedFormat('d M Y')} ({$totalDays} hari)"
                 : $firstDate->translatedFormat('d M Y');
 
-            NotificationDispatcher::notifyBookingSubmitted(
-                $createdEvents,
-                $roomIds,
-                $roomsById,
-                $user,
-                $data['title'],
-                $dateSummary,
-            );
+            foreach ($roomIds as $rId) {
+                $room = $roomsById[$rId] ?? null;
+                if ($room && $room->pic_id) {
+                    $firstRoomEvent = collect($createdEvents)->firstWhere('room_id', $rId);
+                    Notification::create([
+                        'event_id' => $firstRoomEvent?->id,
+                        'user_id' => $room->pic_id,
+                        'message' => "Pengajuan peminjaman ruangan {$room->room_name} baru dari {$user->name} untuk {$dateSummary}: {$data['title']}.",
+                    ]);
+                }
+            }
         }
 
         $firstEvent = $createdEvents[0];
@@ -408,7 +412,19 @@ class EventController extends ApiController
         ]);
 
         // Kirimkan notifikasi hasil keputusan (Disetujui / Ditolak beserta alasannya) kepada pemohon agenda
-        NotificationDispatcher::notifyBookingDecided($event, $user, $data['status'], $reason);
+        if ($data['status'] === 'Ditolak' && ! blank($reason)) {
+            Notification::create([
+                'event_id' => $event->id,
+                'user_id' => $event->user_id,
+                'message' => "Pengajuan agenda {$event->title} ditolak. Alasan: {$reason}",
+            ]);
+        } elseif ($data['status'] === 'Disetujui') {
+            Notification::create([
+                'event_id' => $event->id,
+                'user_id' => $event->user_id,
+                'message' => "Pengajuan agenda {$event->title} di {$event->room->room_name} telah disetujui.",
+            ]);
+        }
 
         return $this->sendResponse(
             new EventResource($event->fresh(['room.pic', 'user', 'approver'])),
