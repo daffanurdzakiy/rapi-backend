@@ -160,7 +160,7 @@
 
 <div class="card">
     @forelse($events as $event)
-        <div class="list">
+        <div id="event-{{ $event->id }}" class="list {{ (int) request('highlight') === (int) $event->id ? 'highlight-target' : '' }}">
             <div class="heading">
                 <div>
                     <h3 style="margin:0">{{ $event->title }}</h3>

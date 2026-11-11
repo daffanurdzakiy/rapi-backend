@@ -13,6 +13,7 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ComplaintController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PicComplaintReportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
@@ -72,6 +73,13 @@ Route::middleware('auth')->group(function () {
 
     // Aksi Persetujuan / Penolakan Agenda Peminjaman Ruangan oleh PIC atau Admin
     Route::patch('/agenda/{event}/keputusan', [EventController::class, 'decide'])->name('events.decide');
+
+    // Pusat Notifikasi In-App Web Desktop (halaman daftar, feed dropdown, buka & tandai dibaca)
+    Route::get('/notifikasi', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifikasi/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
+    Route::get('/notifikasi/{notification}/buka', [NotificationController::class, 'open'])->name('notifications.open');
+    Route::patch('/notifikasi/{notification}/baca', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifikasi/baca-semua', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
     // Proses keluar (Logout) dan menghapus sesi login pengguna
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');

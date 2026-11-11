@@ -53,6 +53,7 @@ class RedirectMobileToFlutterApp
                 'init-storage',
                 'admin/*',
                 'ruangan*',
+                'notifikasi/feed',
                 'pengaduan/*/foto',
                 'pengaduan/*/foto-perbaikan',
                 'pic/laporan-pengaduan/*/foto'

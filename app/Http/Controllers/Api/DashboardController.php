@@ -8,6 +8,7 @@ use App\Http\Resources\NotificationResource;
 use App\Http\Resources\RoomResource;
 use App\Models\Complaint;
 use App\Models\Event;
+use App\Models\Notification;
 use App\Models\Room;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -102,17 +103,14 @@ class DashboardController extends ApiController
                 ->get();
 
             // Ambil 5 notifikasi terbaru untuk PIC
-            $notifications = $user->notifications()
-                ->where(function ($query) use ($user) {
-                    $query->whereNull('complaint_id')
-                        ->orWhereHas('complaint.room', fn ($roomQuery) => $roomQuery->where('pic_id', $user->id));
-                })
+            $visibleNotifications = Notification::visibleTo($user);
+            $notifications = (clone $visibleNotifications)
                 ->with(['complaint', 'event'])
                 ->latest()
                 ->limit(5)
                 ->get();
 
-            $unreadNotificationsCount = $user->notifications()->where('is_read', false)->count();
+            $unreadNotificationsCount = (clone $visibleNotifications)->where('is_read', false)->count();
 
             return $this->sendResponse([
                 'role' => $role,

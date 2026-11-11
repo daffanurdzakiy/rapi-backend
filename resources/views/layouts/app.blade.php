@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'RAPI-Sekolah' }}</title>
     <style>
         :root {
@@ -218,6 +219,367 @@
             border-color: #fca5a5;
             color: #dc2626;
             transform: translateY(-1px);
+        }
+
+        /* =========================================================================
+           PUSAT NOTIFIKASI WEB DESKTOP (LONCENG NAVBAR, DROPDOWN, TOAST, HIGHLIGHT)
+           ========================================================================= */
+        .notif-menu {
+            position: relative;
+        }
+        .notif-bell-btn {
+            position: relative;
+            display: grid;
+            width: 36px;
+            height: 36px;
+            place-items: center;
+            padding: 0;
+            border: 1px solid #d7deea;
+            border-radius: 9px;
+            background: #f8fafc;
+            color: #35465e;
+            cursor: pointer;
+            transition: background .18s, color .18s, border-color .18s, transform .18s;
+        }
+        .notif-bell-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.9;
+        }
+        .notif-bell-btn:hover,
+        .notif-bell-btn[aria-expanded="true"] {
+            background: #eef2f7;
+            border-color: #9fb0c7;
+            color: #1e293b;
+            transform: translateY(-1px);
+        }
+        .notif-bell-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border: 2px solid #fffdf8;
+            border-radius: 99px;
+            background: #dc2626;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 14px;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(220, 38, 38, .35);
+        }
+        .notif-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            z-index: 60;
+            width: min(420px, calc(100vw - 24px));
+            border: 1px solid #dfd6c4;
+            border-radius: 16px;
+            background: #fffdf8;
+            box-shadow: 0 18px 48px rgba(26, 39, 56, .18);
+            overflow: hidden;
+        }
+        .notif-dropdown-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 14px 16px 10px;
+            border-bottom: 1px solid #ece5d8;
+            background: #faf7f0;
+        }
+        .notif-dropdown-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .notif-dropdown-title {
+            margin: 0;
+            font-size: 14.5px;
+            font-weight: 800;
+            color: #26364a;
+        }
+        .notif-dropdown-count {
+            padding: 2px 8px;
+            border-radius: 99px;
+            background: #e8edf4;
+            color: #35465e;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .notif-mark-all-btn {
+            padding: 4px 9px;
+            border: 1px solid #d7deea;
+            border-radius: 7px;
+            background: #fffdf8;
+            color: #35465e;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .16s, border-color .16s;
+        }
+        .notif-mark-all-btn:hover:not(:disabled) {
+            background: #eef2f7;
+            border-color: #9fb0c7;
+        }
+        .notif-mark-all-btn:disabled {
+            opacity: .45;
+            cursor: default;
+        }
+        .notif-dropdown-tabs {
+            display: flex;
+            gap: 6px;
+            padding: 8px 16px;
+            border-bottom: 1px solid #ece5d8;
+            background: #faf7f0;
+        }
+        .notif-tab-btn {
+            padding: 4px 10px;
+            border: 1px solid transparent;
+            border-radius: 99px;
+            background: transparent;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .notif-tab-btn.active {
+            border-color: #35465e;
+            background: #35465e;
+            color: #fffdf8;
+        }
+        .notif-dropdown-list {
+            max-height: 380px;
+            overflow-y: auto;
+        }
+        .notif-dd-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 11px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #efe9dc;
+            background: #fffdf8;
+            cursor: pointer;
+            transition: background .15s;
+        }
+        .notif-dd-item:last-child {
+            border-bottom: 0;
+        }
+        .notif-dd-item:hover {
+            background: #f7f4eb;
+        }
+        .notif-dd-item.is-unread {
+            background: #f2f6fb;
+            box-shadow: inset 3px 0 0 #35465e;
+        }
+        .notif-dd-item.is-unread:hover {
+            background: #e9eff8;
+        }
+        .notif-dd-icon {
+            display: grid;
+            place-items: center;
+            flex: 0 0 32px;
+            width: 32px;
+            height: 32px;
+            margin-top: 2px;
+            border-radius: 9px;
+            border: 1px solid #d7deea;
+            background: #f1f5f9;
+            color: #35465e;
+        }
+        .notif-dd-icon.tone-success { background: #ecfdf5; border-color: #a7f3d0; color: #15803d; }
+        .notif-dd-icon.tone-warning { background: #fffbeb; border-color: #fde68a; color: #b45309; }
+        .notif-dd-icon.tone-danger { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+        .notif-dd-icon.tone-info { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+        .notif-dd-icon svg {
+            width: 15px;
+            height: 15px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .notif-dd-content {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .notif-dd-badges {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 4px;
+        }
+        .notif-dd-cat {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #465a73;
+        }
+        .notif-dd-pill {
+            padding: 1px 7px;
+            border-radius: 99px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .notif-dd-pill.tone-success { background: #dcfce7; color: #166534; }
+        .notif-dd-pill.tone-warning { background: #fef3c7; color: #92400e; }
+        .notif-dd-pill.tone-danger { background: #fee2e2; color: #991b1b; }
+        .notif-dd-pill.tone-info { background: #e0f2fe; color: #0369a1; }
+        .notif-dd-title {
+            margin: 0 0 2px;
+            color: #26364a;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+        .notif-dd-msg {
+            margin: 0;
+            color: #46566d;
+            font-size: 12px;
+            line-height: 1.45;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .notif-dd-meta {
+            margin-top: 5px;
+            color: #6d7788;
+            font-size: 11px;
+        }
+        .notif-dd-read-btn {
+            flex: 0 0 auto;
+            width: 24px;
+            height: 24px;
+            display: grid;
+            place-items: center;
+            border: 1px solid #cfd8e5;
+            border-radius: 50%;
+            background: #fffdf8;
+            color: #35465e;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .notif-dd-read-btn:hover {
+            background: #35465e;
+            border-color: #35465e;
+            color: #fff;
+        }
+        .notif-dropdown-empty {
+            padding: 28px 18px;
+            text-align: center;
+            color: #6d7788;
+            font-size: 13px;
+        }
+        .notif-dropdown-footer {
+            padding: 10px 16px;
+            border-top: 1px solid #ece5d8;
+            background: #faf7f0;
+            text-align: center;
+        }
+        .notif-dropdown-footer a {
+            display: block;
+            color: #35465e;
+            font-size: 12.5px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .notif-dropdown-footer a:hover {
+            color: #1e293b;
+            text-decoration: underline;
+        }
+
+        .notif-toast-stack {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 90;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: min(370px, calc(100vw - 28px));
+            pointer-events: none;
+        }
+        .notif-toast {
+            pointer-events: auto;
+            padding: 13px 15px;
+            border: 1px solid #d7deea;
+            border-left: 4px solid #35465e;
+            border-radius: 12px;
+            background: #fffdf8;
+            box-shadow: 0 14px 36px rgba(26, 39, 56, .2);
+            animation: notifToastIn .22s ease;
+        }
+        @keyframes notifToastIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .notif-toast-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .notif-toast-cat {
+            font-size: 11px;
+            font-weight: 800;
+            color: #35465e;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .notif-toast-close {
+            border: 0;
+            background: transparent;
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .notif-toast-title {
+            margin: 0 0 3px;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #26364a;
+        }
+        .notif-toast-msg {
+            margin: 0 0 8px;
+            font-size: 12.5px;
+            color: #46566d;
+            line-height: 1.45;
+        }
+        .notif-toast-link {
+            font-size: 12px;
+            font-weight: 700;
+            color: #35465e;
+            text-decoration: none;
+        }
+        .notif-toast-link:hover {
+            text-decoration: underline;
+        }
+
+        .highlight-target {
+            margin: 6px -12px;
+            padding: 16px 14px !important;
+            border: 1.5px solid #35465e !important;
+            border-left: 5px solid #d97706 !important;
+            border-radius: 12px;
+            background: #fffbeb;
+            box-shadow: 0 8px 24px rgba(53, 70, 94, .1);
+            animation: highlightPulse 2.4s ease;
+        }
+        @keyframes highlightPulse {
+            0% { box-shadow: 0 0 0 5px rgba(217, 119, 6, .28); }
+            100% { box-shadow: 0 8px 24px rgba(53, 70, 94, .1); }
         }
         .main { width: 100%; }
         .content { width: min(1500px, 100%); margin: 0 auto; padding: 30px clamp(14px, 2vw, 28px) 56px; }
@@ -454,6 +816,27 @@
                 width: 16px;
                 height: 16px;
             }
+            .notif-bell-btn {
+                width: 34px;
+                height: 34px;
+            }
+            .notif-bell-btn svg {
+                width: 16px;
+                height: 16px;
+            }
+            .notif-dropdown {
+                position: fixed;
+                top: 68px;
+                right: 12px;
+                left: 12px;
+                width: auto;
+            }
+            .notif-toast-stack {
+                bottom: 76px;
+                right: 12px;
+                left: 12px;
+                max-width: none;
+            }
 
             .content {
                 padding: 18px 12px 90px;
@@ -538,7 +921,10 @@
 </head>
 <body>
     @php($currentUser = auth()->user())
-    @php($currentRole = $currentUser->role?->role_name)
+    @php($currentRole = $currentUser?->role?->role_name)
+    @php($unreadSummary = $currentUser ? \App\Models\Notification::visibleTo($currentUser)->where('is_read', false)->selectRaw('COUNT(*) as total, COALESCE(MAX(id), 0) as latest_id')->first() : null)
+    @php($unreadNotificationCount = (int) ($unreadSummary?->total ?? 0))
+    @php($latestUnreadNotificationId = (int) ($unreadSummary?->latest_id ?? 0))
     <div class="layout {{ request()->routeIs('dashboard') ? 'dashboard-layout' : '' }}">
         <header class="top">
             <a class="brand" href="{{ route('dashboard') }}">
@@ -560,6 +946,56 @@
                 @endif
             </nav>
             <div class="top-actions">
+                @if($currentUser)
+                    <div class="notif-menu" id="notif-menu">
+                        <button
+                            type="button"
+                            id="notif-bell-btn"
+                            class="notif-bell-btn"
+                            aria-label="Notifikasi"
+                            aria-expanded="false"
+                            aria-controls="notif-dropdown"
+                            title="Notifikasi"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            <span
+                                id="notif-bell-badge"
+                                class="notif-bell-badge"
+                                @if($unreadNotificationCount <= 0) hidden @endif
+                            >{{ $unreadNotificationCount > 99 ? '99+' : $unreadNotificationCount }}</span>
+                        </button>
+
+                        <div id="notif-dropdown" class="notif-dropdown" role="region" aria-label="Daftar notifikasi" hidden>
+                            <div class="notif-dropdown-header">
+                                <div class="notif-dropdown-title-wrap">
+                                    <h3 class="notif-dropdown-title">Notifikasi</h3>
+                                    <span id="notif-dropdown-count" class="notif-dropdown-count">
+                                        {{ $unreadNotificationCount > 0 ? $unreadNotificationCount.' belum dibaca' : 'Semua terbaca' }}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    id="notif-mark-all-btn"
+                                    class="notif-mark-all-btn"
+                                    @if($unreadNotificationCount <= 0) disabled @endif
+                                >Tandai semua dibaca</button>
+                            </div>
+                            <div class="notif-dropdown-tabs">
+                                <button type="button" class="notif-tab-btn active" data-notif-filter="all">Semua</button>
+                                <button type="button" class="notif-tab-btn" data-notif-filter="unread">Belum Dibaca</button>
+                            </div>
+                            <div id="notif-dropdown-list" class="notif-dropdown-list">
+                                <div class="notif-dropdown-empty">Memuat notifikasi...</div>
+                            </div>
+                            <div class="notif-dropdown-footer">
+                                <a href="{{ route('notifications.index') }}">Lihat semua di Pusat Notifikasi →</a>
+                            </div>
+                        </div>
+                    </div>
+                @endif
                 <a class="profile-link" href="{{ route('profile') }}" aria-label="Buka profil {{ $currentUser->name }}">
                     <span class="profile-avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($currentUser->name, 0, 1)) }}</span>
                     <span class="profile">{{ $currentUser->name }}<small>{{ $currentRole }}</small></span>
@@ -628,6 +1064,8 @@
         </nav>
     </div>
 
+    <div id="notif-toast-stack" class="notif-toast-stack" aria-live="polite"></div>
+
     <!-- Route bantuan init-storage tetap ada -->
     <script>
         document.querySelectorAll('.password-toggle').forEach(function (button) {
@@ -639,6 +1077,313 @@
                 button.textContent = visible ? '◉' : '◌';
             });
         });
+
+        (function () {
+            var highlighted = document.querySelector('.highlight-target');
+            if (highlighted) {
+                highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            var menu = document.getElementById('notif-menu');
+            var bellBtn = document.getElementById('notif-bell-btn');
+            var dropdown = document.getElementById('notif-dropdown');
+            var listEl = document.getElementById('notif-dropdown-list');
+            var badgeEl = document.getElementById('notif-bell-badge');
+            var countEl = document.getElementById('notif-dropdown-count');
+            var markAllBtn = document.getElementById('notif-mark-all-btn');
+            var toastStack = document.getElementById('notif-toast-stack');
+            if (!menu || !bellBtn || !dropdown || !listEl) return;
+
+            var csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            var feedUrl = @json(route('notifications.feed', [], false));
+            var readAllUrl = @json(route('notifications.read-all', [], false));
+            var storageKey = 'rapi_last_unread_' + @json($currentUser?->id ?? 0);
+            var activeFilter = 'all';
+            var isOpen = false;
+            var latestKnownUnreadId = Math.max(
+                Number(sessionStorage.getItem(storageKey) || '0'),
+                Number(@json($latestUnreadNotificationId))
+            );
+            sessionStorage.setItem(storageKey, String(latestKnownUnreadId));
+            var initializedBaseline = true;
+
+            function updateBadge(count) {
+                var n = Number(count || 0);
+                if (badgeEl) {
+                    if (n > 0) {
+                        badgeEl.hidden = false;
+                        badgeEl.textContent = n > 99 ? '99+' : String(n);
+                    } else {
+                        badgeEl.hidden = true;
+                        badgeEl.textContent = '0';
+                    }
+                }
+                if (countEl) {
+                    countEl.textContent = n > 0 ? (n + ' belum dibaca') : 'Semua terbaca';
+                }
+                if (markAllBtn) {
+                    markAllBtn.disabled = n <= 0;
+                }
+            }
+
+            function buildIconSvg(category) {
+                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                if (category === 'booking') {
+                    svg.innerHTML = '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>';
+                } else if (category === 'complaint') {
+                    svg.innerHTML = '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>';
+                } else {
+                    svg.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>';
+                }
+                return svg;
+            }
+
+            function renderItems(items) {
+                listEl.textContent = '';
+                if (!items || items.length === 0) {
+                    var empty = document.createElement('div');
+                    empty.className = 'notif-dropdown-empty';
+                    empty.textContent = activeFilter === 'unread'
+                        ? 'Tidak ada notifikasi yang belum dibaca.'
+                        : 'Belum ada notifikasi aktivitas.';
+                    listEl.appendChild(empty);
+                    return;
+                }
+
+                items.forEach(function (item) {
+                    var row = document.createElement('div');
+                    row.className = 'notif-dd-item' + (item.is_read ? '' : ' is-unread');
+                    row.addEventListener('click', function () {
+                        window.location.href = item.open_url;
+                    });
+
+                    var iconWrap = document.createElement('div');
+                    iconWrap.className = 'notif-dd-icon tone-' + (item.tone || 'info');
+                    iconWrap.appendChild(buildIconSvg(item.category));
+
+                    var content = document.createElement('div');
+                    content.className = 'notif-dd-content';
+
+                    var badges = document.createElement('div');
+                    badges.className = 'notif-dd-badges';
+
+                    var catSpan = document.createElement('span');
+                    catSpan.className = 'notif-dd-cat';
+                    catSpan.textContent = item.category_label || 'Notifikasi';
+                    badges.appendChild(catSpan);
+
+                    var pillSpan = document.createElement('span');
+                    pillSpan.className = 'notif-dd-pill tone-' + (item.tone || 'info');
+                    pillSpan.textContent = item.badge_label || 'Info';
+                    badges.appendChild(pillSpan);
+
+                    var title = document.createElement('p');
+                    title.className = 'notif-dd-title';
+                    title.textContent = item.title || '';
+
+                    var msg = document.createElement('p');
+                    msg.className = 'notif-dd-msg';
+                    msg.textContent = item.summary || item.message || '';
+
+                    var metaParts = [];
+                    if (Array.isArray(item.meta) && item.meta.length > 0) {
+                        metaParts.push(item.meta[0].value);
+                    }
+                    if (item.time_ago) {
+                        metaParts.push(item.time_ago);
+                    }
+                    var meta = document.createElement('div');
+                    meta.className = 'notif-dd-meta';
+                    meta.textContent = metaParts.join(' · ');
+
+                    content.appendChild(badges);
+                    content.appendChild(title);
+                    content.appendChild(msg);
+                    content.appendChild(meta);
+
+                    row.appendChild(iconWrap);
+                    row.appendChild(content);
+
+                    if (!item.is_read && item.read_url) {
+                        var readBtn = document.createElement('button');
+                        readBtn.type = 'button';
+                        readBtn.className = 'notif-dd-read-btn';
+                        readBtn.title = 'Tandai sudah dibaca';
+                        readBtn.setAttribute('aria-label', 'Tandai sudah dibaca');
+                        readBtn.textContent = '✓';
+                        readBtn.addEventListener('click', function (ev) {
+                            ev.stopPropagation();
+                            markSingleRead(item.read_url);
+                        });
+                        row.appendChild(readBtn);
+                    }
+
+                    listEl.appendChild(row);
+                });
+            }
+
+            function showToast(item) {
+                if (!toastStack || !item) return;
+                var toast = document.createElement('div');
+                toast.className = 'notif-toast';
+
+                var head = document.createElement('div');
+                head.className = 'notif-toast-head';
+
+                var cat = document.createElement('span');
+                cat.className = 'notif-toast-cat';
+                cat.textContent = (item.category_label || 'Notifikasi') + ' • ' + (item.badge_label || 'Baru');
+
+                var closeBtn = document.createElement('button');
+                closeBtn.type = 'button';
+                closeBtn.className = 'notif-toast-close';
+                closeBtn.setAttribute('aria-label', 'Tutup notifikasi');
+                closeBtn.textContent = '×';
+                closeBtn.addEventListener('click', function () {
+                    toast.remove();
+                });
+
+                head.appendChild(cat);
+                head.appendChild(closeBtn);
+
+                var title = document.createElement('p');
+                title.className = 'notif-toast-title';
+                title.textContent = item.title || 'Notifikasi Baru';
+
+                var msg = document.createElement('p');
+                msg.className = 'notif-toast-msg';
+                msg.textContent = item.summary || item.message || '';
+
+                var link = document.createElement('a');
+                link.className = 'notif-toast-link';
+                link.href = item.open_url;
+                link.textContent = (item.action_label || 'Lihat Detail') + ' →';
+
+                toast.appendChild(head);
+                toast.appendChild(title);
+                toast.appendChild(msg);
+                toast.appendChild(link);
+                toastStack.appendChild(toast);
+
+                setTimeout(function () {
+                    if (toast.parentNode) toast.remove();
+                }, 7000);
+            }
+
+            async function fetchFeed(allowToast) {
+                try {
+                    var url = feedUrl + (activeFilter === 'unread' ? '?only_unread=1' : '');
+                    var res = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (!res.ok) return;
+                    var data = await res.json();
+                    updateBadge(data.unread_count);
+
+                    if (isOpen) {
+                        renderItems(data.items || []);
+                    }
+
+                    var incomingId = Number(data.latest_unread_id || 0);
+                    if (!initializedBaseline) {
+                        initializedBaseline = true;
+                        if (incomingId > latestKnownUnreadId) {
+                            latestKnownUnreadId = incomingId;
+                            sessionStorage.setItem(storageKey, String(latestKnownUnreadId));
+                        }
+                    } else if (allowToast && incomingId > latestKnownUnreadId) {
+                        latestKnownUnreadId = incomingId;
+                        sessionStorage.setItem(storageKey, String(latestKnownUnreadId));
+                        var newest = (data.items || []).find(function (x) { return Number(x.id) === incomingId; });
+                        if (newest) showToast(newest);
+                    }
+                } catch (e) {
+                    // Abaikan error jaringan sementara saat polling
+                }
+            }
+
+            async function markSingleRead(url) {
+                try {
+                    var res = await fetch(url, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (res.ok) {
+                        await fetchFeed(false);
+                    }
+                } catch (e) {}
+            }
+
+            async function markAllRead() {
+                try {
+                    var res = await fetch(readAllUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (res.ok) {
+                        await fetchFeed(false);
+                    }
+                } catch (e) {}
+            }
+
+            function setOpen(open) {
+                isOpen = open;
+                dropdown.hidden = !open;
+                bellBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open) {
+                    fetchFeed(false);
+                }
+            }
+
+            bellBtn.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                setOpen(!isOpen);
+            });
+
+            dropdown.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+            });
+
+            document.addEventListener('click', function () {
+                if (isOpen) setOpen(false);
+            });
+
+            document.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Escape' && isOpen) setOpen(false);
+            });
+
+            dropdown.querySelectorAll('[data-notif-filter]').forEach(function (tab) {
+                tab.addEventListener('click', function () {
+                    activeFilter = tab.getAttribute('data-notif-filter') || 'all';
+                    dropdown.querySelectorAll('[data-notif-filter]').forEach(function (b) {
+                        b.classList.toggle('active', b === tab);
+                    });
+                    fetchFeed(false);
+                });
+            });
+
+            if (markAllBtn) {
+                markAllBtn.addEventListener('click', markAllRead);
+            }
+
+            setInterval(function () {
+                if (document.visibilityState === 'visible') {
+                    fetchFeed(true);
+                }
+            }, 25000);
+        })();
     </script>
 </body>
 </html>

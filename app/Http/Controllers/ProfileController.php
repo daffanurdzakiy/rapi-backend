@@ -7,9 +7,9 @@ use Illuminate\View\View;
 // Controller untuk menampilkan halaman Profil Pengguna yang sedang login di Web.
 class ProfileController extends Controller
 {
-    // Menampilkan view resources/views/profile.blade.php.
+    // Menampilkan view resources/views/profile/index.blade.php.
     public function show(): View
     {
-        return view('profile');
+        return view('profile.index');
     }
 }

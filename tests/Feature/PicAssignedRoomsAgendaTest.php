@@ -115,7 +115,7 @@ class PicAssignedRoomsAgendaTest extends TestCase
         $this->actingAs($pic)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertViewIs('dashboard')
+            ->assertViewIs('dashboard.index')
             ->assertViewHas('todayEvents', 1)
             ->assertSee('Agenda Terkini')
             ->assertSee('Agenda Terkini PIC')
@@ -140,7 +140,7 @@ class PicAssignedRoomsAgendaTest extends TestCase
         $viewData = $response->viewData();
         unset($viewData['featuredRoomSchedules']);
 
-        $html = view('dashboard', $viewData)->render();
+        $html = view('dashboard.index', $viewData)->render();
 
         $this->assertStringContainsString('Selamat datang', $html);
     }

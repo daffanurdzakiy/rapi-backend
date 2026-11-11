@@ -25,25 +25,6 @@ class DashboardController extends Controller
             $complaints->whereHas('room', fn ($q) => $q->where('pic_id', $user->id));
         }
 
-        // Mengambil 5 notifikasi terbaru untuk ditampilkan di Dashboard (limit(5)).
-        $notifications = match ($role) {
-            'PIC' => $user->notifications()
-                ->where(function ($query) use ($user) {
-                    $query->whereNull('complaint_id')
-                        ->orWhereHas('complaint.room', fn ($roomQuery) => $roomQuery->where('pic_id', $user->id));
-                })
-                ->with('complaint')
-                ->latest()
-                ->limit(5)
-                ->get(),
-            'Guru', 'Organisasi' => $user->notifications()
-                ->with(['complaint', 'event'])
-                ->latest()
-                ->limit(5)
-                ->get(),
-            default => collect(),
-        };
-
         // Mengambil 5 agenda peminjaman ruangan yang berstatus Pending atau Disetujui (diurutkan dari hari ini, dan tidak menampilkan yang sudah selesai setelah ganti hari).
         $today = now('Asia/Jakarta')->toDateString();
         $recentEvents = Event::with(['room', 'user'])
@@ -85,7 +66,7 @@ class DashboardController extends Controller
             ]];
         });
 
-        return view('dashboard', [
+        return view('dashboard.index', [
             'roomCount' => $role === 'PIC' ? $assignedRooms->count() : Room::count(),
             'assignedRooms' => $assignedRooms,
             'featuredRoomSchedules' => $featuredRoomSchedules,
@@ -93,7 +74,6 @@ class DashboardController extends Controller
             'pendingComplaints' => (clone $complaints)->where('status_repair', 'Belum Diperbaiki')->count(),
             'recentEvents' => $recentEvents,
             'recentComplaints' => $recentComplaints,
-            'notifications' => $notifications,
         ]);
     }
 }

@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\ComplaintResource;
 use App\Models\Complaint;
-use App\Models\Notification;
 use App\Models\Room;
 use App\Services\ImageCompressionService;
+use App\Support\NotificationDispatcher;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -136,15 +136,11 @@ class ComplaintController extends ApiController
             'status_repair' => 'Belum Diperbaiki',
         ]);
 
-        // Cari ruangan yang dilaporkan; jika ruangan memiliki PIC, kirimkan notifikasi otomatis ke PIC tersebut
+        // Cari ruangan yang dilaporkan; kirimkan notifikasi otomatis ke PIC ruangan tersebut dan Admin
         $room = Room::with('pic')->find($complaint->room_id);
 
-        if ($room && $room->pic_id) {
-            Notification::create([
-                'complaint_id' => $complaint->id,
-                'user_id' => $room->pic_id,
-                'message' => "Pengaduan baru di {$room->room_name} dari {$user->name}: {$complaint->description}",
-            ]);
+        if ($room) {
+            NotificationDispatcher::notifyComplaintSubmitted($complaint, $room, $user);
         }
 
         return $this->sendResponse(
@@ -281,14 +277,13 @@ class ComplaintController extends ApiController
 
         $complaint->update($updateData);
 
-        // Notify reporter about updated repair status
-        // Kirim notifikasi ke pelapor bahwa status perbaikan ruangannya telah diperbarui oleh PIC/Admin
-        $noteInfo = ! empty($data['repair_note']) ? " Keterangan: {$data['repair_note']}" : '';
-        Notification::create([
-            'complaint_id' => $complaint->id,
-            'user_id' => $complaint->reporter_id,
-            'message' => "Status perbaikan pengaduan di {$complaint->room->room_name} diperbarui menjadi: {$data['status_repair']}.{$noteInfo}",
-        ]);
+        // Kirim notifikasi ke pelapor (serta Admin jika status selesai diperbaiki)
+        NotificationDispatcher::notifyComplaintStatusUpdated(
+            $complaint,
+            $user,
+            $data['status_repair'],
+            $data['repair_note'] ?? null,
+        );
 
         return $this->sendResponse(
             new ComplaintResource($complaint->fresh(['room.pic', 'reporter'])),

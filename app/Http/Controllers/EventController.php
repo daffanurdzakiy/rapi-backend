@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
-use App\Models\Notification;
 use App\Models\Room;
 use App\Models\SessionTime;
+use App\Support\NotificationDispatcher;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -225,7 +225,7 @@ class EventController extends Controller
             }
         });
 
-        // Kirimkan notifikasi ke PIC masing-masing ruangan jika status masih 'Pending'
+        // Kirimkan notifikasi ke PIC masing-masing ruangan dan Admin jika status masih 'Pending'
         $firstDate = $dates[0];
         $lastDate = $dates[count($dates) - 1];
         if ($status === 'Pending') {
@@ -233,17 +233,14 @@ class EventController extends Controller
                 ? "{$firstDate->translatedFormat('d M')} s/d {$lastDate->translatedFormat('d M Y')} ({$totalDays} hari)"
                 : $firstDate->translatedFormat('d M Y');
 
-            foreach ($roomIds as $rId) {
-                $room = $roomsById[$rId] ?? null;
-                if ($room && $room->pic_id) {
-                    $firstRoomEvent = collect($createdEvents)->firstWhere('room_id', $rId);
-                    Notification::create([
-                        'event_id' => $firstRoomEvent?->id,
-                        'user_id' => $room->pic_id,
-                        'message' => "Pengajuan peminjaman ruangan {$room->room_name} ({$dateSummary}) dari {$request->user()->name}: {$data['title']}.",
-                    ]);
-                }
-            }
+            NotificationDispatcher::notifyBookingSubmitted(
+                $createdEvents,
+                $roomIds,
+                $roomsById,
+                $request->user(),
+                $data['title'],
+                $dateSummary,
+            );
         }
 
         if ($roleName === 'Admin') {
@@ -358,18 +355,12 @@ class EventController extends Controller
         ]);
 
         if ($roomChanged || $timeChanged) {
-            $message = "Agenda {$event->title} diperbarui: {$event->room->room_name}, "
-                .Carbon::parse($event->start_time)->format('H:i').'-'
-                .Carbon::parse($event->end_time)->format('H:i').'.';
-            if ($roomChanged) {
-                $message .= ' Alasan: '.$data['move_reason'];
-            }
-
-            Notification::create([
-                'event_id' => $event->id,
-                'user_id' => $event->user_id,
-                'message' => $message,
-            ]);
+            NotificationDispatcher::notifyBookingUpdated(
+                $event,
+                $request->user(),
+                $roomChanged,
+                $data['move_reason'] ?? null,
+            );
         }
 
         return redirect()->route('events.index')->with('success', 'Agenda berhasil diperbarui.');
@@ -411,14 +402,8 @@ class EventController extends Controller
             'rejection_reason' => $reason,
         ]);
 
-        // Kirim notifikasi ke pemohon jika agendanya ditolak beserta alasannya.
-        if ($reason !== null && $reason !== '') {
-            Notification::create([
-                'event_id' => $event->id,
-                'user_id' => $event->user_id,
-                'message' => "Pengajuan agenda {$event->title} ditolak. Alasan: {$reason}",
-            ]);
-        }
+        // Kirim notifikasi ke pemohon (serta PIC ruangan bila diproses Admin).
+        NotificationDispatcher::notifyBookingDecided($event, $user, $data['status'], $reason);
 
         return back()->with('success', 'Status agenda berhasil diperbarui.');
     }

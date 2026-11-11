@@ -36,8 +36,8 @@ class CalendarController extends Controller
         // Mengambil jadwal hari libur nasional otomatis (berwarna merah)
         $holidays = $holidayService->getHolidaysForRange($calendarStart, $calendarEnd);
 
-        // Jika sudah login tampilkan view 'calendar', jika belum login (tamu/siswa) tampilkan 'calendar.public'.
-        return view($request->user() ? 'calendar' : 'calendar.public', [
+        // Jika sudah login tampilkan view 'calendar.index', jika belum login (tamu/siswa) tampilkan 'calendar.public'.
+        return view($request->user() ? 'calendar.index' : 'calendar.public', [
             'month' => $month,
             'events' => $events,
             'holidays' => $holidays,

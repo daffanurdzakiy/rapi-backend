@@ -710,7 +710,7 @@ class ComplaintAccessTest extends TestCase
         // 5. Namun pada halaman Laporan PIC, laporan lama (> 24 jam) tetap tersimpan dan dapat dilihat
         $this->actingAs($pic)
             ->get(route('pic.complaint-reports.index', [
-                'periode' => 'mingguan',
+                'periode' => 'bulanan',
                 'tanggal' => now()->toDateString(),
             ]))
             ->assertOk()

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Complaint;
-use App\Models\Notification;
 use App\Models\Room;
 use App\Services\ImageCompressionService;
+use App\Support\NotificationDispatcher;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -286,12 +286,8 @@ class ComplaintController extends Controller
         $complaint = Complaint::create($data + ['reporter_id' => $request->user()->id]);
         $room = Room::with('pic')->findOrFail($complaint->room_id);
 
-        // Membuat notifikasi otomatis untuk PIC yang bertanggung jawab atas ruangan tersebut.
-        Notification::create([
-            'complaint_id' => $complaint->id,
-            'user_id' => $room->pic_id,
-            'message' => "Pengaduan baru di {$room->room_name} dari {$request->user()->name}: {$complaint->description}",
-        ]);
+        // Membuat notifikasi otomatis untuk PIC ruangan terkait dan Admin.
+        NotificationDispatcher::notifyComplaintSubmitted($complaint, $room, $request->user());
 
         return redirect()->route('complaints.index')->with('success', 'Pengaduan berhasil dikirim.');
     }
@@ -402,13 +398,13 @@ class ComplaintController extends Controller
 
         $complaint->update($updateData);
 
-        // Notifikasi ke pelapor pengaduan jika status diupdate oleh PIC
-        $noteSnippet = ! empty($data['repair_note']) ? " Keterangan: {$data['repair_note']}" : '';
-        Notification::create([
-            'complaint_id' => $complaint->id,
-            'user_id' => $complaint->reporter_id,
-            'message' => "Status perbaikan pengaduan di {$complaint->room->room_name} diperbarui menjadi: {$data['status_repair']}.{$noteSnippet}",
-        ]);
+        // Notifikasi ke pelapor pengaduan (dan Admin jika status selesai diperbaiki).
+        NotificationDispatcher::notifyComplaintStatusUpdated(
+            $complaint,
+            $request->user(),
+            $data['status_repair'],
+            $data['repair_note'] ?? null,
+        );
 
         return back()->with('success', 'Status perbaikan berhasil diperbarui.');
     }
