@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Complaint;
+use App\Models\Notification;
 use App\Models\Room;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -80,6 +81,73 @@ class PicComplaintReportTest extends TestCase
             ->assertSee('Kerusakan harian')
             ->assertDontSee('Kerusakan bulan ini')
             ->assertDontSee('Kerusakan PIC lain');
+    }
+
+    public function test_room_reassignment_moves_open_repairs_and_repair_history_to_the_new_pic(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $oldPic = $this->userWithRole('PIC');
+        $newPic = $this->userWithRole('PIC');
+        $reporter = $this->userWithRole('Guru');
+        $room = $this->roomFor($oldPic, 'Ruang Alih Tanggung Jawab');
+        $openComplaint = $this->complaintFor($room, $reporter, 'Pending diperbaiki setelah alih PIC', now()->toDateTimeString());
+        $repairHistory = $this->complaintFor($room, $reporter, 'Riwayat perbaikan sebelum alih PIC', now()->toDateTimeString());
+        $repairHistory->update([
+            'status_repair' => 'Sudah Diperbaiki',
+            'repair_note' => 'Sudah selesai sebelum perpindahan PIC.',
+        ]);
+        $openNotification = Notification::create([
+            'complaint_id' => $openComplaint->id,
+            'user_id' => $oldPic->id,
+            'message' => 'Ada pengaduan baru.',
+        ]);
+        $historyNotification = Notification::create([
+            'complaint_id' => $repairHistory->id,
+            'user_id' => $oldPic->id,
+            'message' => 'Status pengaduan diperbarui.',
+        ]);
+        $reporterNotification = Notification::create([
+            'complaint_id' => $openComplaint->id,
+            'user_id' => $reporter->id,
+            'message' => 'Status pengaduan diperbarui.',
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.users.rooms.reassign-pic', [$oldPic, $room]), [
+                'pic_id' => $newPic->id,
+            ])
+            ->assertRedirect(route('admin.users.index'));
+
+        $this->assertDatabaseHas('notifications', ['id' => $openNotification->id, 'user_id' => $newPic->id]);
+        $this->assertDatabaseHas('notifications', ['id' => $historyNotification->id, 'user_id' => $newPic->id]);
+        $this->assertDatabaseHas('notifications', ['id' => $reporterNotification->id, 'user_id' => $reporter->id]);
+
+        $this->actingAs($newPic)
+            ->get(route('complaints.index'))
+            ->assertOk()
+            ->assertSee('Pending diperbaiki setelah alih PIC');
+
+        $this->get(route('pic.complaint-reports.index', [
+            'periode' => 'harian',
+            'tanggal' => now()->toDateString(),
+        ]))
+            ->assertOk()
+            ->assertSee('Pending diperbaiki setelah alih PIC')
+            ->assertSee('Riwayat perbaikan sebelum alih PIC');
+
+        $this->actingAs($oldPic)
+            ->get(route('complaints.index'))
+            ->assertOk()
+            ->assertDontSee('Pending diperbaiki setelah alih PIC')
+            ->assertDontSee('Riwayat perbaikan sebelum alih PIC');
+
+        $this->get(route('pic.complaint-reports.index', [
+            'periode' => 'harian',
+            'tanggal' => now()->toDateString(),
+        ]))
+            ->assertOk()
+            ->assertDontSee('Pending diperbaiki setelah alih PIC')
+            ->assertDontSee('Riwayat perbaikan sebelum alih PIC');
     }
 
     public function test_non_pic_cannot_access_pic_complaint_report(): void

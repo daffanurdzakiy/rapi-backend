@@ -25,6 +25,18 @@
     .user-edit-form { padding:0 23px 23px; }
     .user-edit-form .form-grid { gap:0 16px; }
     .user-edit-actions { display:flex; justify-content:flex-end; gap:9px; margin-top:20px; padding-top:15px; border-top:1px solid #e8e1d3; }
+    .pic-room-dialog { width:min(720px, calc(100% - 32px)); max-height:min(88vh, 760px); overflow:auto; margin:auto; padding:22px; border:1px solid #e8e1d3; border-radius:18px; background:#fffdf8; color:#26364a; box-shadow:0 24px 80px rgba(38, 54, 74, .18); }
+    .pic-room-dialog::backdrop { background:rgba(38, 54, 74, .4); backdrop-filter:blur(5px); }
+    .pic-room-dialog-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:8px; }
+    .pic-room-dialog-heading h2 { margin:0; font-size:20px; }
+    .pic-room-dialog > p { margin:0 0 16px; color:#6d7788; font-size:13px; line-height:1.5; }
+    .pic-room-list { display:grid; gap:12px; margin:0; padding:0; list-style:none; }
+    .pic-room-item { padding:14px; border:1px solid #e8e1d3; border-radius:12px; background:#fff; }
+    .pic-room-item > p { margin:4px 0 12px; color:#6d7788; font-size:12px; }
+    .pic-room-reassign-form { display:flex; flex-wrap:wrap; align-items:flex-end; gap:9px; }
+    .pic-room-reassign-form label { flex:1 1 220px; margin:0; }
+    .pic-room-reassign-form select { width:100%; margin-top:5px; }
+    .pic-room-dialog-footer { display:flex; justify-content:flex-end; gap:9px; margin-top:18px; }
     @media (max-width:760px) {
         .users-toolbar { align-items:stretch; flex-direction:column; }
         .users-actions-group { width:100%; gap:6px; }
@@ -34,6 +46,8 @@
         .user-actions .btn { min-height:34px; padding:7px 10px; font-size:12px; }
         .user-edit-form .form-grid { grid-template-columns:1fr; }
         .user-edit-heading, .user-edit-form { padding-right:18px; padding-left:18px; }
+        .pic-room-dialog { padding:18px; }
+        .pic-room-reassign-form .btn { flex:1 1 100%; }
     }
 </style>
 <div class="heading">
@@ -58,6 +72,56 @@
         </div>
         <button type="button" class="flash-alert-close" aria-label="Tutup pemberitahuan" title="Tutup" data-flash-close>&times;</button>
     </div>
+@endif
+
+@if(session('pic_blocking_user') && session('pic_blocking_rooms'))
+    @php($blockingPic = session('pic_blocking_user'))
+    <dialog class="pic-room-dialog" id="pic-room-reassignment-dialog" aria-labelledby="pic-room-dialog-title">
+        <div class="pic-room-dialog-heading">
+            <h2 id="pic-room-dialog-title">Ruangan masih terikat ke akun</h2>
+            <button class="btn ghost" type="button" data-close-pic-room-dialog aria-label="Tutup">Tutup</button>
+        </div>
+        <p>
+            Akun <b>{{ $blockingPic['name'] }}</b> belum dapat dihapus. Pindahkan penanggung jawab setiap ruangan di bawah ke PIC lain, lalu hapus akun ini kembali.
+        </p>
+        @if($replacementPics->isEmpty())
+            <div class="flash-alert flash-alert--warning" role="alert">
+                Belum ada PIC lain yang dapat dipilih. Tambahkan akun PIC baru terlebih dahulu melalui tombol <b>Tambah Pengguna</b>.
+            </div>
+        @else
+            <ul class="pic-room-list">
+                @foreach(session('pic_blocking_rooms') as $blockingRoom)
+                    <li class="pic-room-item">
+                        <strong>{{ $blockingRoom['room_name'] }}</strong>
+                        @if($blockingRoom['location'])
+                            <p>{{ $blockingRoom['location'] }}</p>
+                        @else
+                            <p>Lokasi tidak diisi.</p>
+                        @endif
+                        <form class="pic-room-reassign-form" method="post" action="{{ route('admin.users.rooms.reassign-pic', [$blockingPic['id'], $blockingRoom['id']]) }}">
+                            @csrf
+                            @method('PUT')
+                            <label for="replacement-pic-{{ $blockingRoom['id'] }}">
+                                Pindahkan ke PIC
+                                <select id="replacement-pic-{{ $blockingRoom['id'] }}" name="pic_id" required>
+                                    <option value="">Pilih PIC pengganti</option>
+                                    @foreach($replacementPics as $replacementPic)
+                                        <option value="{{ $replacementPic->id }}" @selected((string) old('pic_id') === (string) $replacementPic->id)>
+                                            {{ $replacementPic->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <button class="btn" type="submit">Pindahkan Ruangan</button>
+                        </form>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+        <div class="pic-room-dialog-footer">
+            <button class="btn ghost" type="button" data-close-pic-room-dialog>Tutup</button>
+        </div>
+    </dialog>
 @endif
 
 <div class="card users-toolbar">
@@ -273,6 +337,15 @@
     @if ($errors->any() && old('user_id'))
         document.getElementById('user-edit-{{ old('user_id') }}')?.showModal();
     @endif
+    @if(session('pic_blocking_user') && session('pic_blocking_rooms'))
+        document.getElementById('pic-room-reassignment-dialog')?.showModal();
+    @endif
+
+    document.querySelectorAll('[data-close-pic-room-dialog]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            document.getElementById('pic-room-reassignment-dialog')?.close();
+        });
+    });
 
     (function () {
         var addCard = document.querySelector('.add-user-card');

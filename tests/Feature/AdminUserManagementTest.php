@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Room;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -9,6 +10,96 @@ use Tests\TestCase;
 
 class AdminUserManagementTest extends TestCase
 {
+    public function test_admin_cannot_delete_pic_with_assigned_rooms_and_can_reassign_them_quickly(): void
+    {
+        $admin = $this->createAdmin();
+        $picRole = $this->createRole('PIC');
+        $picToDelete = User::factory()->create([
+            'name' => 'PIC Lama',
+            'role_id' => $picRole,
+        ]);
+        $replacementPic = User::factory()->create([
+            'name' => 'PIC Pengganti',
+            'role_id' => $picRole,
+        ]);
+        $firstRoom = Room::create([
+            'room_name' => 'Laboratorium IPA',
+            'location' => 'Gedung A',
+            'capacity' => 30,
+            'pic_id' => $picToDelete->id,
+        ]);
+        $secondRoom = Room::create([
+            'room_name' => 'Ruang Musik',
+            'location' => 'Gedung B',
+            'capacity' => 20,
+            'pic_id' => $picToDelete->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.users.index'))
+            ->delete(route('admin.users.destroy', $picToDelete))
+            ->assertRedirect(route('admin.users.index'))
+            ->assertSessionHas('error')
+            ->assertSessionHas('pic_blocking_rooms', fn (array $rooms): bool => count($rooms) === 2
+                && collect($rooms)->pluck('id')->all() === [$firstRoom->id, $secondRoom->id]);
+
+        $this->get(route('admin.users.index'))
+            ->assertOk()
+            ->assertSee('Ruangan masih terikat ke akun')
+            ->assertSee('Laboratorium IPA')
+            ->assertSee('Ruang Musik')
+            ->assertSee('PIC Pengganti')
+            ->assertSee(route('admin.users.rooms.reassign-pic', [$picToDelete, $firstRoom]), false)
+            ->assertSee(route('admin.users.rooms.reassign-pic', [$picToDelete, $secondRoom]), false);
+
+        $this->put(route('admin.users.rooms.reassign-pic', [$picToDelete, $firstRoom]), [
+            'pic_id' => $replacementPic->id,
+        ])
+            ->assertRedirect(route('admin.users.index'))
+            ->assertSessionHas('success', 'PIC ruangan Laboratorium IPA berhasil dipindahkan ke PIC Pengganti.')
+            ->assertSessionHas('pic_blocking_rooms', fn (array $rooms): bool => count($rooms) === 1
+                && $rooms[0]['id'] === $secondRoom->id);
+
+        $this->put(route('admin.users.rooms.reassign-pic', [$picToDelete, $secondRoom]), [
+            'pic_id' => $replacementPic->id,
+        ])
+            ->assertRedirect(route('admin.users.index'))
+            ->assertSessionHas('success', 'Semua ruangan berhasil dipindahkan ke PIC Pengganti. Akun PIC Lama sekarang dapat dihapus.');
+
+        $this->assertDatabaseHas('rooms', ['id' => $firstRoom->id, 'pic_id' => $replacementPic->id]);
+        $this->assertDatabaseHas('rooms', ['id' => $secondRoom->id, 'pic_id' => $replacementPic->id]);
+
+        $this->delete(route('admin.users.destroy', $picToDelete))
+            ->assertRedirect(route('admin.users.index'))
+            ->assertSessionHas('success', 'Akun berhasil dihapus.');
+
+        $this->assertDatabaseMissing('users', ['id' => $picToDelete->id]);
+        $this->assertDatabaseCount('rooms', 2);
+    }
+
+    public function test_admin_cannot_assign_a_room_to_a_non_pic_during_quick_reassignment(): void
+    {
+        $admin = $this->createAdmin();
+        $pic = User::factory()->create(['role_id' => $this->createRole('PIC')]);
+        $guru = User::factory()->create(['role_id' => $this->createRole('Guru')]);
+        $room = Room::create([
+            'room_name' => 'Ruang Rapat',
+            'capacity' => 12,
+            'pic_id' => $pic->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.users.index'))
+            ->put(route('admin.users.rooms.reassign-pic', [$pic, $room]), [
+                'pic_id' => $guru->id,
+            ])
+            ->assertRedirect(route('admin.users.index'))
+            ->assertSessionHasErrors('pic_id')
+            ->assertSessionHas('pic_blocking_rooms');
+
+        $this->assertDatabaseHas('rooms', ['id' => $room->id, 'pic_id' => $pic->id]);
+    }
+
     public function test_admin_can_create_a_user_and_see_it_in_the_user_list(): void
     {
         $admin = $this->createAdmin();

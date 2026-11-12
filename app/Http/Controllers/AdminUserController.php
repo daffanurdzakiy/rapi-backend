@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Complaint;
 use App\Models\Role;
+use App\Models\Room;
 use App\Models\User;
 use App\Services\SpreadsheetReaderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -21,6 +26,11 @@ class AdminUserController extends Controller
     {
         // Mengambil kata kunci pencarian dari parameter URL ?q=...
         $search = trim((string) $request->query('q', ''));
+        $blockingPicId = $request->session()->get('pic_blocking_user.id');
+        $replacementPics = User::whereHas('role', fn ($query) => $query->where('role_name', 'PIC'))
+            ->when($blockingPicId, fn ($query) => $query->whereKeyNot($blockingPicId))
+            ->orderBy('name')
+            ->get();
         $users = User::with('role')
             // Jika ada kata kunci pencarian, filter berdasarkan nama, email, nomor WhatsApp, atau nama role.
             ->when($search !== '', function ($query) use ($search): void {
@@ -47,6 +57,7 @@ class AdminUserController extends Controller
         return view('admin.users', [
             'roles' => Role::orderBy('id')->get(),
             'users' => $users,
+            'replacementPics' => $replacementPics,
             'search' => $search,
         ]);
     }
@@ -232,9 +243,100 @@ class AdminUserController extends Controller
     public function destroy(Request $request, User $user): RedirectResponse
     {
         abort_if($request->user()->is($user), 422, 'Akun yang sedang digunakan tidak dapat dihapus.');
-        $user->delete();
 
-        return redirect()->route('admin.users.index')->with('success', 'Akun berhasil dihapus.');
+        return DB::transaction(function () use ($user): RedirectResponse {
+            $user = User::query()->lockForUpdate()->findOrFail($user->id);
+            $assignedRooms = Room::query()
+                ->where('pic_id', $user->id)
+                ->orderBy('room_name')
+                ->lockForUpdate()
+                ->get(['id', 'room_name', 'location']);
+
+            if ($assignedRooms->isNotEmpty()) {
+                return $this->redirectToRoomReassignment(
+                    $user,
+                    $assignedRooms,
+                    "Akun {$user->name} tidak dapat dihapus karena masih terikat dengan ".($user->role?->role_name === 'PIC' ? 'ruangan berikut' : 'penugasan PIC ruangan berikut').'.',
+                );
+            }
+
+            $user->delete();
+
+            return redirect()->route('admin.users.index')->with('success', 'Akun berhasil dihapus.');
+        });
+    }
+
+    public function reassignRoomPic(Request $request, User $user, Room $room): RedirectResponse
+    {
+        abort_unless((int) $room->pic_id === (int) $user->id, 404);
+
+        $replacementPicIds = User::whereHas('role', fn ($query) => $query->where('role_name', 'PIC'))
+            ->whereKeyNot($user->id)
+            ->pluck('id')
+            ->all();
+        $validator = Validator::make($request->all(), [
+            'pic_id' => ['required', 'integer', Rule::in($replacementPicIds)],
+        ], [
+            'pic_id.required' => 'Pilih PIC pengganti.',
+            'pic_id.in' => 'PIC pengganti harus akun PIC lain yang aktif.',
+        ]);
+
+        if ($validator->fails()) {
+            $assignedRooms = Room::query()
+                ->where('pic_id', $user->id)
+                ->orderBy('room_name')
+                ->get(['id', 'room_name', 'location']);
+
+            return $this->redirectToRoomReassignment(
+                $user,
+                $assignedRooms,
+                'PIC ruangan belum dipindahkan. Periksa pilihan PIC pengganti.',
+            )->withErrors($validator)->withInput();
+        }
+
+        return DB::transaction(function () use ($user, $room, $validator): RedirectResponse {
+            $sourcePic = User::query()->lockForUpdate()->findOrFail($user->id);
+            $lockedRoom = Room::query()->lockForUpdate()->findOrFail($room->id);
+            abort_unless((int) $lockedRoom->pic_id === (int) $sourcePic->id, 404);
+
+            $replacementPic = User::with('role')
+                ->lockForUpdate()
+                ->findOrFail((int) $validator->validated()['pic_id']);
+            abort_unless($replacementPic->role?->role_name === 'PIC', 422, 'PIC pengganti harus memiliki peran PIC.');
+
+            $lockedRoom->update(['pic_id' => $replacementPic->id]);
+            DB::table('notifications')
+                ->where('user_id', $sourcePic->id)
+                ->whereIn('complaint_id', Complaint::query()->select('id')->where('room_id', $lockedRoom->id))
+                ->update([
+                    'user_id' => $replacementPic->id,
+                    'updated_at' => now(),
+                ]);
+            $remainingRooms = Room::query()
+                ->where('pic_id', $sourcePic->id)
+                ->orderBy('room_name')
+                ->get(['id', 'room_name', 'location']);
+            $message = $remainingRooms->isEmpty()
+                ? "Semua ruangan berhasil dipindahkan ke {$replacementPic->name}. Akun {$sourcePic->name} sekarang dapat dihapus."
+                : "PIC ruangan {$lockedRoom->room_name} berhasil dipindahkan ke {$replacementPic->name}.";
+
+            if ($remainingRooms->isNotEmpty()) {
+                return $this->redirectToRoomReassignment($sourcePic, $remainingRooms, $message, 'success');
+            }
+
+            return redirect()->route('admin.users.index')->with('success', $message);
+        });
+    }
+
+    private function redirectToRoomReassignment(User $user, Collection $rooms, string $message, string $messageType = 'error'): RedirectResponse
+    {
+        return redirect()->route('admin.users.index')
+            ->with($messageType, $message)
+            ->with('pic_blocking_user', ['id' => $user->id, 'name' => $user->name])
+            ->with('pic_blocking_rooms', $rooms->map(fn (Room $room): array => [
+                'id' => $room->id,
+                'room_name' => $room->room_name,
+                'location' => $room->location,
+            ])->all());
     }
 }
-

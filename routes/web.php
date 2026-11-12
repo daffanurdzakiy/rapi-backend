@@ -92,6 +92,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/users/template-import', [AdminUserController::class, 'downloadTemplate'])->name('admin.users.template');
     Route::post('/admin/users/import', [AdminUserController::class, 'import'])->name('admin.users.import');
     Route::put('/admin/users/{user}', [AdminUserController::class, 'update'])->name('admin.users.update');
+    Route::put('/admin/users/{user}/rooms/{room}/pic', [AdminUserController::class, 'reassignRoomPic'])->name('admin.users.rooms.reassign-pic');
     Route::delete('/admin/users/{user}', [AdminUserController::class, 'destroy'])->name('admin.users.destroy');
 
     // Manajemen Data Ruangan (CRUD Ruangan oleh Admin)
