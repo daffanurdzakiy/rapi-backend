@@ -78,9 +78,11 @@
                 </button>
             </div>
             <input type="hidden" name="booking_type" id="booking_type" value="{{ old('booking_type', old('end_date') ? 'range' : 'single') }}">
-            <input id="event_date" type="date" name="event_date" value="{{ old('event_date') }}" min="{{ $firstBookingDate }}" required>
+            <input id="event_date" type="date" name="event_date" value="{{ old('event_date') }}" min="{{ $firstBookingDate }}" data-today="{{ now()->toDateString() }}" required>
             @if(!($isAdmin ?? (auth()->user()?->role?->role_name === 'Admin')))
                 <p id="single_date_hint" class="muted">Peminjaman ruang hanya dapat diajukan mulai H-1 (besok) dan seterusnya.</p>
+            @else
+                <p id="today_start_time_hint" class="muted" hidden>Untuk peminjaman hari ini, pilih jam mulai yang belum lewat.</p>
             @endif
             @error('event_date')<p class="error">{{ $message }}</p>@enderror
 
@@ -699,6 +701,41 @@
             toggleFreeTime();
         }
     });
+</script>
+@endif
+@if($isAdmin)
+<script>
+    (function () {
+        var dateInput = document.getElementById('event_date');
+        var startSelect = document.getElementById('start_time');
+        var startFreeInput = document.getElementById('start_time_free');
+        var todayHint = document.getElementById('today_start_time_hint');
+        var today = dateInput.dataset.today;
+
+        function refreshPastStartTimes() {
+            var isToday = dateInput.value === today;
+            var currentTime = new Date().toTimeString().slice(0, 5);
+
+            Array.from(startSelect.options).forEach(function (option) {
+                if (/^\d{2}:\d{2}$/.test(option.value)) {
+                    option.disabled = isToday && option.value < currentTime;
+                }
+            });
+
+            if (startSelect.selectedIndex >= 0 && startSelect.options[startSelect.selectedIndex].disabled) {
+                startSelect.value = '';
+            }
+
+            if (startFreeInput) {
+                startFreeInput.min = isToday && currentTime > '17:01' ? currentTime : '17:01';
+            }
+            if (todayHint) todayHint.hidden = !isToday;
+        }
+
+        dateInput.addEventListener('change', refreshPastStartTimes);
+        window.setInterval(refreshPastStartTimes, 30000);
+        refreshPastStartTimes();
+    })();
 </script>
 @endif
 @endsection

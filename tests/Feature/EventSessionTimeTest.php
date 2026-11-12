@@ -59,6 +59,7 @@ class EventSessionTimeTest extends TestCase
 
     public function test_admin_can_book_room_on_today_hari_h(): void
     {
+        $this->travelTo(now()->startOfDay()->setTime(8, 0));
         $admin = $this->userWithRole('Admin');
         $room = $this->room();
 
@@ -80,6 +81,59 @@ class EventSessionTimeTest extends TestCase
             'event_date' => now()->toDateString().' 00:00:00',
             'status' => 'Disetujui',
         ]);
+    }
+
+    public function test_admin_cannot_book_a_start_time_that_has_passed_today(): void
+    {
+        $this->travelTo(now()->startOfDay()->setTime(10, 0));
+        $admin = $this->userWithRole('Admin');
+        $room = $this->room();
+        $today = now()->toDateString();
+        $booking = [
+            'room_id' => $room->id,
+            'title' => 'Agenda dengan jam yang sudah lewat',
+            'event_date' => $today,
+            'start_time' => '09:30',
+            'end_time' => '10:15',
+        ];
+
+        $this->actingAs($admin)
+            ->from(route('events.create'))
+            ->post(route('events.store'), $booking)
+            ->assertRedirect(route('events.create'))
+            ->assertSessionHasErrors(['start_time']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/events', [
+                'room_id' => $room->id,
+                'title' => $booking['title'],
+                'dates' => [$today, now()->addDay()->toDateString()],
+                'start_time' => $booking['start_time'],
+                'end_time' => $booking['end_time'],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['start_time']);
+
+        $this->actingAs($admin)
+            ->getJson(route('events.check-availability', [
+                'room_id' => $room->id,
+                'event_date' => $today,
+                'start_time' => $booking['start_time'],
+                'end_time' => $booking['end_time'],
+            ]))
+            ->assertStatus(422)
+            ->assertJsonPath('available', false);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/events/check-availability?'.http_build_query([
+                'room_id' => $room->id,
+                'event_date' => $today,
+                'start_time' => $booking['start_time'],
+                'end_time' => $booking['end_time'],
+            ]))
+            ->assertStatus(422);
+
+        $this->assertDatabaseCount('events', 0);
     }
 
     public function test_room_booking_rejects_dates_before_tomorrow(): void
@@ -909,6 +963,7 @@ class EventSessionTimeTest extends TestCase
 
     public function test_multi_date_booking_with_custom_dates_array_via_web_and_api(): void
     {
+        $this->travelTo(now()->startOfDay()->setTime(7, 0));
         $admin = $this->userWithRole('Admin');
         $guru = $this->userWithRole('Guru');
         $room = $this->room('Lab Komputer 1');

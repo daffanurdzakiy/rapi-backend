@@ -186,6 +186,12 @@ class EventController extends Controller
             ]);
         }
 
+        if ($roleName === 'Admin' && $this->isStartTimeBeforeNowOnToday($dates, $data['start_time'])) {
+            throw ValidationException::withMessages([
+                'start_time' => 'Untuk peminjaman hari ini, jam mulai tidak boleh sebelum waktu sekarang.',
+            ]);
+        }
+
         // Mengecek ketersediaan seluruh ruangan (Anti-Bentrok) untuk setiap hari dalam rentang tanggal
         $roomsById = Room::whereIn('id', $roomIds)->get()->keyBy('id');
         foreach ($roomIds as $rId) {
@@ -570,6 +576,20 @@ class EventController extends Controller
         $endTime = $request->input('end_time');
         $ignoreId = $request->input('ignore_event_id') ? (int) $request->input('ignore_event_id') : null;
 
+        if (
+            $request->user()->role?->role_name === 'Admin'
+            && $this->isStartTimeBeforeNowOnToday($dates, $startTime)
+        ) {
+            $message = 'Untuk peminjaman hari ini, jam mulai tidak boleh sebelum waktu sekarang.';
+
+            return response()->json([
+                'success' => false,
+                'available' => false,
+                'message' => $message,
+                'errors' => ['start_time' => [$message]],
+            ], 422);
+        }
+
         foreach ($roomIds as $rId) {
             $roomName = $roomsById[$rId]->room_name ?? "Ruang #{$rId}";
             foreach ($dates as $date) {
@@ -728,5 +748,16 @@ class EventController extends Controller
                 'room_id' => "Ruangan sudah digunakan pada rentang waktu tersebut ({$dateFormatted}) oleh agenda \"{$conflict->title}\" ({$conflictTime}) di {$roomName}. Silakan pilih ruang atau waktu lain.",
             ]);
         }
+    }
+
+    /** Prevent Admin bookings from starting in the past when any selected date is today. */
+    private function isStartTimeBeforeNowOnToday(array $dates, string $startTime): bool
+    {
+        $today = Carbon::today()->toDateString();
+        $includesToday = collect($dates)->contains(
+            fn ($date) => Carbon::parse($date)->toDateString() === $today,
+        );
+
+        return $includesToday && $startTime < now()->format('H:i');
     }
 }

@@ -237,6 +237,12 @@ class EventController extends ApiController
             ], 422);
         }
 
+        if ($canUseFreeTime && $this->isStartTimeBeforeNowOnToday($dates, $data['start_time'])) {
+            $message = 'Untuk peminjaman hari ini, jam mulai tidak boleh sebelum waktu sekarang.';
+
+            return $this->sendError('Validasi gagal.', ['start_time' => [$message]], 422);
+        }
+
         // Mengecek apakah seluruh ruangan yang dipilih sudah dipakai pada setiap hari dalam rentang tanggal
         $roomsById = Room::whereIn('id', $roomIds)->get()->keyBy('id');
         foreach ($roomIds as $rId) {
@@ -560,6 +566,15 @@ class EventController extends ApiController
             return $this->sendError('Tanggal kegiatan harus disertakan.', null, 422);
         }
 
+        if (
+            $request->user()->role?->role_name === 'Admin'
+            && $this->isStartTimeBeforeNowOnToday($dates, $data['start_time'])
+        ) {
+            $message = 'Untuk peminjaman hari ini, jam mulai tidak boleh sebelum waktu sekarang.';
+
+            return $this->sendError('Parameter tidak valid.', ['start_time' => [$message]], 422);
+        }
+
         $roomsById = Room::whereIn('id', $roomIds)->get()->keyBy('id');
         $conflictRoom = null;
         $conflictDate = null;
@@ -635,6 +650,17 @@ class EventController extends ApiController
             ->get()
             ->map(fn (SessionTime $s) => substr($s->time, 0, 5))
             ->all();
+    }
+
+    /** Prevent Admin bookings from starting in the past when any selected date is today. */
+    private function isStartTimeBeforeNowOnToday(array $dates, string $startTime): bool
+    {
+        $today = Carbon::today()->toDateString();
+        $includesToday = collect($dates)->contains(
+            fn ($date) => Carbon::parse($date)->toDateString() === $today,
+        );
+
+        return $includesToday && $startTime < now()->format('H:i');
     }
 
     /**
