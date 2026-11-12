@@ -38,7 +38,6 @@ class EventCancellationService
             $recipientIds = User::query()
                 ->whereHas('role', fn ($query) => $query->where('role_name', 'Admin'))
                 ->pluck('id')
-                ->push($event->room()->value('pic_id'))
                 ->filter()
                 ->unique();
 
@@ -60,10 +59,7 @@ class EventCancellationService
             $event = Event::query()->lockForUpdate()->findOrFail($event->id);
             $role = $reviewer->role?->role_name;
 
-            if (
-                $role !== 'Admin'
-                && ! ($role === 'PIC' && $event->room()->where('pic_id', $reviewer->id)->exists())
-            ) {
+            if ($role !== 'Admin') {
                 abort(403);
             }
 

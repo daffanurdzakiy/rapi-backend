@@ -758,6 +758,7 @@ class EventSessionTimeTest extends TestCase
 
     public function test_multi_day_booking_creates_daily_events_for_guru(): void
     {
+        $admin = $this->userWithRole('Admin');
         $guru = $this->userWithRole('Guru');
         $room = $this->room('Lab Komputer 1');
         $startDate = now()->addDays(2)->toDateString();
@@ -802,9 +803,9 @@ class EventSessionTimeTest extends TestCase
             'status' => 'Pending',
         ]);
 
-        // Cek notifikasi terkirim ke PIC
+        // Pengajuan menunggu keputusan Admin.
         $this->assertDatabaseHas('notifications', [
-            'user_id' => $room->pic_id,
+            'user_id' => $admin->id,
         ]);
     }
 

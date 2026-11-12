@@ -153,19 +153,21 @@
        title="Agenda yang sudah terlaksana hari ini akan tampil hingga pukul 23:59 sebelum otomatis diarsipkan">
         Sudah Terlaksana <span class="filter-count">{{ $counts['sudah_terlaksana'] ?? 0 }}</span>
     </a>
-    <a href="{{ route('events.index', ['status' => 'menunggu_persetujuan']) }}"
-       class="filter-tab {{ $current === 'menunggu_persetujuan' ? 'active' : '' }}">
-        Menunggu Persetujuan <span class="filter-count">{{ $counts['menunggu_persetujuan'] ?? 0 }}</span>
-    </a>
-    <a href="{{ route('events.index', ['status' => 'ditolak']) }}"
-       class="filter-tab {{ $current === 'ditolak' ? 'active' : '' }}"
-       title="Pengajuan yang ditolak akan tampil selama 24 jam sebelum otomatis diarsipkan">
-        Ditolak <span class="filter-count">{{ $counts['ditolak'] ?? 0 }}</span>
-    </a>
-    <a href="{{ route('events.index', ['status' => 'menunggu_pembatalan']) }}"
-       class="filter-tab {{ $current === 'menunggu_pembatalan' ? 'active' : '' }}">
-        Menunggu Pembatalan <span class="filter-count">{{ $counts['menunggu_pembatalan'] ?? 0 }}</span>
-    </a>
+    @unless(auth()->user()->role?->role_name === 'PIC')
+        <a href="{{ route('events.index', ['status' => 'menunggu_persetujuan']) }}"
+           class="filter-tab {{ $current === 'menunggu_persetujuan' ? 'active' : '' }}">
+            Menunggu Persetujuan <span class="filter-count">{{ $counts['menunggu_persetujuan'] ?? 0 }}</span>
+        </a>
+        <a href="{{ route('events.index', ['status' => 'ditolak']) }}"
+           class="filter-tab {{ $current === 'ditolak' ? 'active' : '' }}"
+           title="Pengajuan yang ditolak akan tampil selama 24 jam sebelum otomatis diarsipkan">
+            Ditolak <span class="filter-count">{{ $counts['ditolak'] ?? 0 }}</span>
+        </a>
+        <a href="{{ route('events.index', ['status' => 'menunggu_pembatalan']) }}"
+           class="filter-tab {{ $current === 'menunggu_pembatalan' ? 'active' : '' }}">
+            Menunggu Pembatalan <span class="filter-count">{{ $counts['menunggu_pembatalan'] ?? 0 }}</span>
+        </a>
+    @endunless
     <a href="{{ route('events.index', ['status' => 'dibatalkan']) }}"
        class="filter-tab {{ $current === 'dibatalkan' ? 'active' : '' }}">
         Dibatalkan <span class="filter-count">{{ $counts['dibatalkan'] ?? 0 }}</span>
@@ -214,7 +216,7 @@
                     <a class="btn ghost" href="{{ route('complaints.create', ['room_id' => $event->room_id]) }}">Laporkan Kerusakan Ruangan</a>
                 @endif
 
-                @if(in_array(auth()->user()->role?->role_name, ['Admin', 'PIC']) && $event->status === 'Pending')
+                @if(auth()->user()->role?->role_name === 'Admin' && $event->status === 'Pending')
                     <form method="post" action="{{ route('events.decide', $event) }}" style="display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0; flex:1 1 auto;">
                         @csrf
                         @method('PATCH')
@@ -229,7 +231,7 @@
                         </div>
                     </form>
                 @endif
-                @if(in_array(auth()->user()->role?->role_name, ['Admin', 'PIC']) && $event->status === 'Menunggu Pembatalan')
+                @if(auth()->user()->role?->role_name === 'Admin' && $event->status === 'Menunggu Pembatalan')
                     <form method="post" action="{{ route('events.cancellation.decide', $event) }}" style="display:inline-flex; margin:0;">
                         @csrf
                         @method('PATCH')

@@ -64,7 +64,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('api.dashboard');
 
     // Agenda / Peminjaman Ruangan
-    // Mengambil daftar agenda, membuat pengajuan baru, melihat detail, dan menyetujui/menolak agenda (khusus PIC/Admin)
+    // Mengambil daftar agenda, membuat pengajuan baru, melihat detail, dan memproses keputusan agenda (khusus Admin)
     Route::get('/events', [EventController::class, 'index'])->name('api.events.index');
     Route::post('/events', [EventController::class, 'store'])->name('api.events.store');
     Route::get('/events/{event}', [EventController::class, 'show'])->name('api.events.show');

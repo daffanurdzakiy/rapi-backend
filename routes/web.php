@@ -71,7 +71,7 @@ Route::middleware('auth')->group(function () {
     Route::match(['patch', 'post'], '/pengaduan/{complaint}/status', [ComplaintController::class, 'updateStatus'])->name('complaints.status');
     Route::delete('/pengaduan/{complaint}', [ComplaintController::class, 'destroy'])->name('complaints.destroy');
 
-    // Aksi Persetujuan / Penolakan Agenda Peminjaman Ruangan oleh PIC atau Admin
+    // Aksi Persetujuan / Penolakan Agenda Peminjaman Ruangan oleh Admin
     Route::patch('/agenda/{event}/keputusan', [EventController::class, 'decide'])->name('events.decide');
     Route::patch('/agenda/{event}/keputusan-pembatalan', [EventController::class, 'decideCancellation'])->name('events.cancellation.decide');
 

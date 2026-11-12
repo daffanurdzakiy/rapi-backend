@@ -49,8 +49,11 @@ class PicAssignedRoomsAgendaTest extends TestCase
             ->assertSee($assignedRoom->room_name)
             ->assertDontSee('Agenda Ruangan PIC Lain')
             ->assertDontSee('Ruang Perpustakaan')
-            ->assertSee('Setujui')
-            ->assertSee('Tolak')
+            ->assertDontSee('Setujui')
+            ->assertDontSee('Tolak')
+            ->assertDontSee(route('events.index', ['status' => 'menunggu_persetujuan']), false)
+            ->assertDontSee(route('events.index', ['status' => 'ditolak']), false)
+            ->assertDontSee(route('events.index', ['status' => 'menunggu_pembatalan']), false)
             ->assertDontSee('Ajukan Agenda')
             ->assertDontSee('Laporkan Kerusakan Ruangan')
             ->assertDontSee('Edit');
@@ -201,7 +204,7 @@ class PicAssignedRoomsAgendaTest extends TestCase
         }
     }
 
-    public function test_pic_can_decide_agenda_for_assigned_room_but_cannot_edit_or_submit_agendas(): void
+    public function test_pic_cannot_decide_agendas_and_cannot_edit_or_submit_agendas(): void
     {
         $pic = $this->userWithRole('PIC');
         $otherPic = $this->userWithRole('PIC');
@@ -241,25 +244,30 @@ class PicAssignedRoomsAgendaTest extends TestCase
                 'status' => 'Ditolak',
                 'rejection_reason' => 'Ruangan sedang diperbaiki.',
             ])
-            ->assertRedirect();
+            ->assertForbidden();
 
         $this->assertDatabaseHas('events', [
             'id' => $assignedEvent->id,
-            'status' => 'Ditolak',
-            'rejection_reason' => 'Ruangan sedang diperbaiki.',
+            'status' => 'Pending',
+            'rejection_reason' => null,
         ]);
 
         $this->patch(route('events.decide', $approvedEvent), [
             'status' => 'Disetujui',
-        ])->assertRedirect();
+        ])->assertForbidden();
         $this->assertDatabaseHas('events', [
             'id' => $approvedEvent->id,
-            'status' => 'Disetujui',
-            'approved_by' => $pic->id,
+            'status' => 'Pending',
+            'approved_by' => null,
         ]);
         $this->get(route('events.index'))
             ->assertOk()
-            ->assertSee('Disetujui oleh: '.$pic->name.' (PIC)');
+            ->assertSee('Agenda untuk diputuskan PIC')
+            ->assertDontSee(route('events.index', ['status' => 'menunggu_persetujuan']), false)
+            ->assertDontSee(route('events.index', ['status' => 'ditolak']), false)
+            ->assertDontSee(route('events.index', ['status' => 'menunggu_pembatalan']), false)
+            ->assertDontSee('Setujui')
+            ->assertDontSee('Konfirmasi Tolak');
 
         $this->patch(route('events.decide', $otherEvent), [
             'status' => 'Disetujui',

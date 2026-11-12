@@ -14,7 +14,7 @@ class EventCancellationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_owner_can_request_cancellation_and_pic_can_reject_it(): void
+    public function test_only_admin_can_decide_an_event_cancellation_request(): void
     {
         $this->travelTo(Carbon::create(2026, 11, 11, 10, 0, 0, 'Asia/Jakarta'));
         [$admin, $pic, $owner, $event] = $this->makeApprovedEvent();
@@ -33,17 +33,26 @@ class EventCancellationTest extends TestCase
             'cancellation_reason' => 'Kegiatan dibatalkan oleh penyelenggara.',
         ]);
         $this->assertDatabaseHas('notifications', ['event_id' => $event->id, 'user_id' => $admin->id]);
-        $this->assertDatabaseHas('notifications', ['event_id' => $event->id, 'user_id' => $pic->id]);
+        $this->assertDatabaseMissing('notifications', ['event_id' => $event->id, 'user_id' => $pic->id]);
 
         $this->actingAs($pic)
             ->get(route('events.index'))
             ->assertOk()
-            ->assertSee('Menunggu Pembatalan')
-            ->assertSee('Tolak Pembatalan')
-            ->assertSee('Kegiatan dibatalkan oleh penyelenggara.');
+            ->assertSee('Kegiatan dibatalkan oleh penyelenggara.')
+            ->assertDontSee(route('events.index', ['status' => 'menunggu_persetujuan']), false)
+            ->assertDontSee(route('events.index', ['status' => 'ditolak']), false)
+            ->assertDontSee(route('events.index', ['status' => 'menunggu_pembatalan']), false)
+            ->assertDontSee('Setujui Pembatalan')
+            ->assertDontSee('Tolak Pembatalan');
 
         $this->actingAs($pic)
-            ->from(route('events.index'))
+            ->patch(route('events.cancellation.decide', $event), [
+                'status' => 'Disetujui',
+                'cancellation_decision_reason' => 'Agenda tetap dibutuhkan sekolah.',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($admin)
             ->patch(route('events.cancellation.decide', $event), [
                 'status' => 'Disetujui',
                 'cancellation_decision_reason' => 'Agenda tetap dibutuhkan sekolah.',
@@ -55,19 +64,19 @@ class EventCancellationTest extends TestCase
             'id' => $event->id,
             'status' => 'Disetujui',
             'cancellation_decision_reason' => 'Agenda tetap dibutuhkan sekolah.',
-            'cancellation_reviewed_by' => $pic->id,
+            'cancellation_reviewed_by' => $admin->id,
         ]);
         $this->assertDatabaseHas('notifications', [
             'event_id' => $event->id,
             'user_id' => $owner->id,
-            'message' => "Permintaan pembatalan agenda {$event->title} ditolak oleh {$pic->name}. Alasan: Agenda tetap dibutuhkan sekolah.",
+            'message' => "Permintaan pembatalan agenda {$event->title} ditolak oleh {$admin->name}. Alasan: Agenda tetap dibutuhkan sekolah.",
         ]);
     }
 
     public function test_api_cancellation_approval_releases_room_only_after_decision(): void
     {
         $this->travelTo(Carbon::create(2026, 11, 11, 10, 0, 0, 'Asia/Jakarta'));
-        [, $pic, $owner, $event] = $this->makeApprovedEvent();
+        [$admin, $pic, $owner, $event] = $this->makeApprovedEvent();
 
         $this->apiAs($owner)
             ->postJson("/api/events/{$event->id}/cancellation-request", [
@@ -91,9 +100,15 @@ class EventCancellationTest extends TestCase
             ->patchJson("/api/events/{$event->id}/cancellation-decision", [
                 'status' => 'Dibatalkan',
             ])
+            ->assertForbidden();
+
+        $this->apiAs($admin)
+            ->patchJson("/api/events/{$event->id}/cancellation-decision", [
+                'status' => 'Dibatalkan',
+            ])
             ->assertOk()
             ->assertJsonPath('data.status', 'Dibatalkan')
-            ->assertJsonPath('data.cancellation_reviewed_by', $pic->id);
+            ->assertJsonPath('data.cancellation_reviewed_by', $admin->id);
 
         $this->getJson($availabilityUrl)
             ->assertOk()
@@ -101,7 +116,7 @@ class EventCancellationTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'event_id' => $event->id,
             'user_id' => $owner->id,
-            'message' => "Permintaan pembatalan agenda {$event->title} disetujui oleh {$pic->name}.",
+            'message' => "Permintaan pembatalan agenda {$event->title} disetujui oleh {$admin->name}.",
         ]);
     }
 
@@ -136,7 +151,7 @@ class EventCancellationTest extends TestCase
     public function test_cancellation_cannot_be_approved_after_the_agenda_has_started(): void
     {
         $this->travelTo(Carbon::create(2026, 11, 11, 10, 0, 0, 'Asia/Jakarta'));
-        [, $pic, $owner, $event] = $this->makeApprovedEvent();
+        [$admin, $pic, $owner, $event] = $this->makeApprovedEvent();
 
         $this->apiAs($owner)
             ->postJson("/api/events/{$event->id}/cancellation-request", [
@@ -146,6 +161,12 @@ class EventCancellationTest extends TestCase
 
         $this->travelTo(Carbon::create(2026, 11, 12, 9, 0, 0, 'Asia/Jakarta'));
         $this->apiAs($pic)
+            ->patchJson("/api/events/{$event->id}/cancellation-decision", [
+                'status' => 'Dibatalkan',
+            ])
+            ->assertForbidden();
+
+        $this->apiAs($admin)
             ->patchJson("/api/events/{$event->id}/cancellation-decision", [
                 'status' => 'Dibatalkan',
             ])

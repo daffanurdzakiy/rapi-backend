@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Notification;
 use App\Models\Room;
 use App\Models\SessionTime;
+use App\Models\User;
 use App\Services\EventCancellationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -240,7 +241,7 @@ class EventController extends Controller
             }
         });
 
-        // Kirimkan notifikasi ke PIC masing-masing ruangan jika status masih 'Pending'
+        // Kirimkan notifikasi kepada Admin jika status masih 'Pending'
         $firstDate = $dates[0];
         $lastDate = $dates[count($dates) - 1];
         if ($status === 'Pending') {
@@ -248,15 +249,18 @@ class EventController extends Controller
                 ? "{$firstDate->translatedFormat('d M')} s/d {$lastDate->translatedFormat('d M Y')} ({$totalDays} hari)"
                 : $firstDate->translatedFormat('d M Y');
 
+            $adminIds = User::whereHas('role', fn ($query) => $query->where('role_name', 'Admin'))->pluck('id');
             foreach ($roomIds as $rId) {
                 $room = $roomsById[$rId] ?? null;
-                if ($room && $room->pic_id) {
+                if ($room) {
                     $firstRoomEvent = collect($createdEvents)->firstWhere('room_id', $rId);
-                    Notification::create([
-                        'event_id' => $firstRoomEvent?->id,
-                        'user_id' => $room->pic_id,
-                        'message' => "Pengajuan peminjaman ruangan {$room->room_name} ({$dateSummary}) dari {$request->user()->name}: {$data['title']}.",
-                    ]);
+                    foreach ($adminIds as $adminId) {
+                        Notification::create([
+                            'event_id' => $firstRoomEvent?->id,
+                            'user_id' => $adminId,
+                            'message' => "Pengajuan peminjaman ruangan {$room->room_name} ({$dateSummary}) dari {$request->user()->name}: {$data['title']}.",
+                        ]);
+                    }
                 }
             }
         }
@@ -273,13 +277,13 @@ class EventController extends Controller
             }
         } else {
             if ($totalRooms > 1 && $totalDays > 1) {
-                $message = "Agenda berhasil diajukan untuk {$totalRooms} ruangan selama {$totalDays} hari ({$firstDate->translatedFormat('d M')} - {$lastDate->translatedFormat('d M Y')}) dan menunggu persetujuan PIC.";
+                $message = "Agenda berhasil diajukan untuk {$totalRooms} ruangan selama {$totalDays} hari ({$firstDate->translatedFormat('d M')} - {$lastDate->translatedFormat('d M Y')}) dan menunggu persetujuan Admin.";
             } elseif ($totalRooms > 1) {
-                $message = "Agenda berhasil diajukan untuk {$totalRooms} ruangan dan menunggu persetujuan PIC.";
+                $message = "Agenda berhasil diajukan untuk {$totalRooms} ruangan dan menunggu persetujuan Admin.";
             } elseif ($totalDays > 1) {
-                $message = "Agenda berhasil diajukan untuk {$totalDays} hari ({$firstDate->translatedFormat('d M')} - {$lastDate->translatedFormat('d M Y')}) dan menunggu persetujuan PIC.";
+                $message = "Agenda berhasil diajukan untuk {$totalDays} hari ({$firstDate->translatedFormat('d M')} - {$lastDate->translatedFormat('d M Y')}) dan menunggu persetujuan Admin.";
             } else {
-                $message = 'Agenda berhasil diajukan dan menunggu persetujuan.';
+                $message = 'Agenda berhasil diajukan dan menunggu persetujuan Admin.';
             }
         }
 
@@ -296,11 +300,13 @@ class EventController extends Controller
 
         $cancellations->request($event, $request->user(), trim($data['cancellation_reason']));
 
-        return back()->with('success', 'Permintaan pembatalan berhasil dikirim dan menunggu persetujuan PIC atau Admin.');
+        return back()->with('success', 'Permintaan pembatalan berhasil dikirim dan menunggu persetujuan Admin.');
     }
 
     public function decideCancellation(Request $request, Event $event, EventCancellationService $cancellations): RedirectResponse
     {
+        abort_unless($request->user()->role?->role_name === 'Admin', 403);
+
         $data = $request->validate([
             'status' => ['required', 'in:Dibatalkan,Disetujui'],
             'cancellation_decision_reason' => ['required_if:status,Disetujui', 'nullable', 'string', 'max:1000'],
@@ -429,23 +435,13 @@ class EventController extends Controller
         return redirect()->route('events.index')->with('success', 'Agenda berhasil diperbarui.');
     }
 
-    /** Approve or reject a pending booking as Admin or the assigned room's PIC. */
-    // Memproses keputusan Setujui ('Disetujui') atau Tolak ('Ditolak') oleh Admin maupun PIC ruangan terkait.
+    /** Approve or reject a pending booking as Admin. */
+    // Memproses keputusan Setujui ('Disetujui') atau Tolak ('Ditolak') oleh Admin.
     public function decide(Request $request, Event $event): RedirectResponse
     {
         abort_unless($event->status !== 'Menunggu Pembatalan', 422, 'Gunakan keputusan permintaan pembatalan untuk agenda ini.');
+        abort_unless($request->user()->role?->role_name === 'Admin', 403);
         $user = $request->user();
-        $role = $user->role?->role_name;
-        abort_unless(
-            $role === 'Admin'
-                || ($role === 'PIC' && $event->room()->where('pic_id', $user->id)->exists()),
-            403,
-        );
-        abort_unless(
-            $role === 'Admin' || $event->status === 'Pending',
-            422,
-            'Hanya agenda yang menunggu persetujuan yang dapat diproses.',
-        );
 
         // Jika ditolak, wajib mengisi alasan penolakan (rejection_reason).
         $data = $request->validate([

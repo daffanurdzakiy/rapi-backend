@@ -121,6 +121,7 @@ class ApiTest extends TestCase
 
     public function test_pending_bookings_do_not_block_but_approved_bookings_prevent_conflicts(): void
     {
+        $admin = $this->userWithRole('Admin');
         $pic = $this->userWithRole('PIC');
         $room = Room::create([
             'room_name' => 'Aula Utama',
@@ -145,7 +146,17 @@ class ApiTest extends TestCase
         $createResponse->assertCreated()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.status', 'Pending')
-            ->assertJsonPath('data.title', 'LDK OSIS 2026');
+            ->assertJsonPath('data.title', 'LDK OSIS 2026')
+            ->assertJsonPath('message', 'Agenda berhasil diajukan dan menunggu persetujuan Admin.');
+
+        $this->assertDatabaseHas('notifications', [
+            'event_id' => data_get($createResponse->json(), 'data.id'),
+            'user_id' => $admin->id,
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'event_id' => data_get($createResponse->json(), 'data.id'),
+            'user_id' => $pic->id,
+        ]);
 
         // A pending booking does not block another proposal for the same time.
         $pendingResponse = $this->authenticateWithToken($token)->postJson('/api/events', [
@@ -174,7 +185,7 @@ class ApiTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
-    public function test_pic_cannot_propose_event_but_can_decide_booking_for_their_room(): void
+    public function test_pic_cannot_propose_or_decide_events(): void
     {
         $pic = $this->userWithRole('PIC');
         $room = Room::create([
@@ -207,23 +218,16 @@ class ApiTest extends TestCase
             'end_time' => '13:15',
         ])->assertForbidden();
 
-        // PIC can approve the pending event
-        $approveResponse = $this->authenticateWithToken($picToken)->patchJson("/api/events/{$event->id}/decide", [
-            'status' => 'Disetujui',
-        ]);
-
-        $approveResponse->assertOk()
-            ->assertJsonPath('data.status', 'Disetujui');
+        $this->authenticateWithToken($picToken)
+            ->patchJson("/api/events/{$event->id}/decide", [
+                'status' => 'Disetujui',
+            ])
+            ->assertForbidden();
 
         $this->assertDatabaseHas('events', [
             'id' => $event->id,
-            'status' => 'Disetujui',
-            'approved_by' => $pic->id,
-        ]);
-
-        $this->assertDatabaseHas('notifications', [
-            'user_id' => $guru->id,
-            'event_id' => $event->id,
+            'status' => 'Pending',
+            'approved_by' => null,
         ]);
     }
 

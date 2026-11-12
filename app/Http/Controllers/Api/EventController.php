@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Notification;
 use App\Models\Room;
 use App\Models\SessionTime;
+use App\Models\User;
 use App\Services\EventCancellationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,7 @@ use Illuminate\Support\Facades\Validator;
 // =========================================================================
 // Mengatur seluruh logika peminjaman ruangan: daftar agenda sesuai role,
 // pengajuan peminjaman baru (beserta validasi H-1, sesi jam, dan anti-bentrok),
-// melihat detail agenda, keputusan persetujuan/penolakan oleh PIC, dan cek ketersediaan.
+// melihat detail agenda, keputusan persetujuan/penolakan oleh Admin, dan cek ketersediaan.
 class EventController extends ApiController
 {
     /**
@@ -294,8 +295,7 @@ class EventController extends ApiController
             }
         });
 
-        // If submitted by Guru/Organisasi, optionally notify each room's PIC
-        // Kirim notifikasi ke PIC masing-masing ruangan bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
+        // Kirim notifikasi kepada Admin bahwa ada pengajuan peminjaman baru yang menunggu persetujuan
         $firstDate = $dates[0];
         $lastDate = $dates[count($dates) - 1];
         if ($status === 'Pending') {
@@ -303,15 +303,18 @@ class EventController extends ApiController
                 ? "{$firstDate->translatedFormat('d M')} s/d {$lastDate->translatedFormat('d M Y')} ({$totalDays} hari)"
                 : $firstDate->translatedFormat('d M Y');
 
+            $adminIds = User::whereHas('role', fn ($query) => $query->where('role_name', 'Admin'))->pluck('id');
             foreach ($roomIds as $rId) {
                 $room = $roomsById[$rId] ?? null;
-                if ($room && $room->pic_id) {
+                if ($room) {
                     $firstRoomEvent = collect($createdEvents)->firstWhere('room_id', $rId);
-                    Notification::create([
-                        'event_id' => $firstRoomEvent?->id,
-                        'user_id' => $room->pic_id,
-                        'message' => "Pengajuan peminjaman ruangan {$room->room_name} baru dari {$user->name} untuk {$dateSummary}: {$data['title']}.",
-                    ]);
+                    foreach ($adminIds as $adminId) {
+                        Notification::create([
+                            'event_id' => $firstRoomEvent?->id,
+                            'user_id' => $adminId,
+                            'message' => "Pengajuan peminjaman ruangan {$room->room_name} baru dari {$user->name} untuk {$dateSummary}: {$data['title']}.",
+                        ]);
+                    }
                 }
             }
         }
@@ -327,12 +330,12 @@ class EventController extends ApiController
                         : 'Agenda berhasil dibuat dan langsung disetujui.'));
         } else {
             $message = ($totalRooms > 1 && $totalDays > 1)
-                ? "Agenda {$totalRooms} ruangan selama {$totalDays} hari berhasil diajukan dan menunggu persetujuan PIC."
+                ? "Agenda {$totalRooms} ruangan selama {$totalDays} hari berhasil diajukan dan menunggu persetujuan Admin."
                 : (($totalRooms > 1)
-                    ? "Agenda {$totalRooms} ruangan berhasil diajukan dan menunggu persetujuan PIC."
+                    ? "Agenda {$totalRooms} ruangan berhasil diajukan dan menunggu persetujuan Admin."
                     : (($totalDays > 1)
-                        ? "Agenda {$totalDays} hari berhasil diajukan dan menunggu persetujuan PIC."
-                        : 'Agenda berhasil diajukan dan menunggu persetujuan PIC.'));
+                        ? "Agenda {$totalDays} hari berhasil diajukan dan menunggu persetujuan Admin."
+                        : 'Agenda berhasil diajukan dan menunggu persetujuan Admin.'));
         }
 
         return $this->sendResponse(
@@ -371,28 +374,19 @@ class EventController extends ApiController
     }
 
     /**
-     * Approve or reject a pending booking (PIC or Admin).
+     * Approve or reject a pending booking as Admin.
      */
     // Endpoint: PATCH /api/events/{event}/decide
-    // Memproses keputusan persetujuan ('Disetujui') atau penolakan ('Ditolak') oleh PIC ruangan atau Admin
+    // Memproses keputusan persetujuan ('Disetujui') atau penolakan ('Ditolak') oleh Admin
     public function decide(Request $request, Event $event): JsonResponse
     {
+        $user = $request->user();
+        if ($user->role?->role_name !== 'Admin') {
+            return $this->sendError('Hanya Admin yang dapat memproses persetujuan agenda.', null, 403);
+        }
+
         if ($event->status === 'Menunggu Pembatalan') {
             return $this->sendError('Gunakan keputusan permintaan pembatalan untuk agenda ini.', null, 422);
-        }
-
-        $user = $request->user();
-        $role = $user->role?->role_name;
-
-        // Pastikan user yang memproses adalah Admin atau PIC yang bertanggung jawab atas ruangan agenda ini
-        $isRoomPic = $role === 'PIC' && $event->room()->where('pic_id', $user->id)->exists();
-        if ($role !== 'Admin' && ! $isRoomPic) {
-            return $this->sendError('Anda bukan PIC dari ruangan agenda ini.', null, 403);
-        }
-
-        // Bagi PIC, hanya agenda yang masih berstatus 'Pending' yang boleh diubah keputusannya
-        if ($role !== 'Admin' && $event->status !== 'Pending') {
-            return $this->sendError('Hanya agenda yang berstatus Pending yang dapat diproses.', null, 422);
         }
 
         // Validasi input keputusan: jika ditolak ('Ditolak'), alasan penolakan (`rejection_reason`) wajib diisi
@@ -468,12 +462,16 @@ class EventController extends ApiController
 
         return $this->sendResponse(
             new EventResource($updatedEvent),
-            'Permintaan pembatalan berhasil dikirim dan menunggu persetujuan PIC atau Admin.',
+            'Permintaan pembatalan berhasil dikirim dan menunggu persetujuan Admin.',
         );
     }
 
     public function decideCancellation(Request $request, Event $event, EventCancellationService $cancellations): JsonResponse
     {
+        if ($request->user()->role?->role_name !== 'Admin') {
+            return $this->sendError('Hanya Admin yang dapat memproses permintaan pembatalan agenda.', null, 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'status' => ['required', 'in:Dibatalkan,Disetujui'],
             'cancellation_decision_reason' => ['required_if:status,Disetujui', 'nullable', 'string', 'max:1000'],
